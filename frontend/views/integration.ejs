@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>scExplorer</title>
+    <link rel="icon" href="/scexplorer/images/logo_sc_explorer_v1.ico" type="image/x-icon">
+    <link rel="stylesheet" href="/scexplorer/css/styles.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <script src="/scexplorer/js/help-enhancements.js"></script>
+    <script src="/config.js"></script>
+    <script src="/scexplorer/js/api-base.js"></script>
+    <style>
+      .plot-wrapper { max-height: 75vh; overflow: auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px; }
+      .plot-toolbar { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 8px; }
+      .plot-toolbar button { padding: 4px 8px; font-size: 12px; cursor: pointer; }
+      .plot-img { max-width: 100%; height: auto; display: block; }
+      .plot-iframe { width: 100%; height: 75vh; border: none; }
+    </style>
+</head>
+
+<body>
+    <aside class="sidebar">
+        <img src="/scexplorer/images/logo_sc_explorer_v1.png" alt="scExplorer logo" class="sidebar-logo" />
+        <h1 class="sidebar-title">scExplorer</h1>
+        <ul>
+            <li><a href="/scexplorer/"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="/scexplorer/integration"><i class="fas fa-layer-group"></i>Integration</a></li>
+            <li><a href="/scexplorer/upload"><span class="step-number">0</span> <i class="fas fa-upload"></i> Upload</a></li>
+            <li><a href="/scexplorer/preprocess"><span class="step-number">1</span> <i class="fas fa-cogs"></i> Preprocess</a></li>
+            <li><a href="/scexplorer/embedding"><span class="step-number">2</span> <i class="fas fa-vector-square"></i> Embedding</a></li>
+            <li><a href="/scexplorer/dea"><span class="step-number">3</span> <i class="fas fa-chart-bar"></i> DEA</a></li>
+            <li><a href="/scexplorer/visualization"><span class="step-number">4</span> <i class="fas fa-chart-area"></i> Visualization</a></li>
+            <li><a href="/scexplorer/heatmap"><span class="step-number">5</span> <i class="fas fa-th"></i> Heatmap</a></li>
+            <li><a href="/scexplorer/results"><span class="step-number">6</span> <i class="fas fa-poll"></i> Results</a></li>
+        </ul>
+        <div class="sidebar-divider"></div>
+        <ul class="documentation-section">
+            <li><a id="api-docs-link" href="https://apps.cienciavida.org/backend/docs" target="_blank"><i class="fas fa-book"></i> API Documentation</a></li>
+        </ul>
+        <div class="resizer"></div>
+        <i id="toggleSidebarBtn" class="fas fa-angle-double-left white-icon" onclick="toggleSidebar()"></i>
+    </aside>
+    <button id="showSidebarBtn" class="show-sidebar-btn" onclick="toggleSidebar()"><i class="fas fa-angle-double-right"></i></button>
+
+    <section>
+
+        <div class="header-buttons">
+            <button onclick="openHelpModal()">Help</button>
+        </div>
+
+        <h2><i class="fas fa-layer-group"></i> Data Integration</h2>
+
+        <div class="row">
+            <div class="column third">
+                <div class="input-group">
+                    <label for="analysisName">Analysis Name:</label>
+                    <input type="text" id="analysisName" name="analysisName" placeholder="Enter Analysis Name" required autocomplete="off" />
+                </div>
+            </div>
+            <div class="column third">
+                <div class="input-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" name="email" placeholder="Enter Email" required autocomplete="email" />
+                </div>
+            </div>
+            <div class="column third">
+                <div class="input-group">
+                    <label for="batchCorrectionMethod">Batch Correction Method:</label>
+                    <select id="batchCorrectionMethod" name="batchCorrectionMethod">
+                        <option value="combat">Combat</option>
+                        <option value="scanorama">Scanorama</option>
+                        <option value="bbknn">BBKNN</option>
+                        <option value="harmony">Harmony</option>
+                    </select>
+                </div>
+            </div>
+            <div class="column third">
+                <div class="input-group">
+                    <label for="preprocess">Preprocess:</label>
+                    <select id="preprocess" name="preprocess">
+                        <option value="true">True</option>
+                        <option value="false">False</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="column third" id="container1">
+                <div class="upload-container" ondrop="dropHandler(event, 'fileInput1', this);" ondragover="dragOverHandler(event, this);" ondragleave="dragLeaveHandler(event, this);">
+                    <i class="fas fa-upload upload-icon"></i>
+                    <p>Drag file(s) here to upload.</p>
+                    <p id="droppedFileName1"></p>
+                    <p>Alternatively, you can select files by <a href="#" onclick="document.getElementById('fileInput1').click();">clicking here</a></p>
+                    <input type="file" id="fileInput1" multiple accept=".h5ad,.h5,.rds,.mtx,.tsv,.gz" style="display: none" onchange="handleFileSelection('fileInput1', 'droppedFileName1')" />
+                </div>
+            </div>
+            <div class="column third" id="container2">
+                <div class="upload-container" ondrop="dropHandler(event, 'fileInput2', this);" ondragover="dragOverHandler(event, this);" ondragleave="dragLeaveHandler(event, this);">
+                    <i class="fas fa-upload upload-icon"></i>
+                    <p>Drag file(s) here to upload.</p>
+                    <p id="droppedFileName2"></p>
+                    <p>Alternatively, you can select files by <a href="#" onclick="document.getElementById('fileInput2').click();">clicking here</a></p>
+                    <input type="file" id="fileInput2" multiple accept=".h5ad,.h5,.rds,.mtx,.tsv,.gz" style="display: none" onchange="handleFileSelection('fileInput2', 'droppedFileName2')" />
+                </div>
+            </div>
+            <div class="column third" id="container3" style="display:none;">
+                <div class="upload-container" ondrop="dropHandler(event, 'fileInput3', this);" ondragover="dragOverHandler(event, this);" ondragleave="dragLeaveHandler(event, this);">
+                    <i class="fas fa-upload upload-icon"></i>
+                    <p>Drag file(s) here to upload.</p>
+                    <p id="droppedFileName3"></p>
+                    <p>Alternatively, you can select files by <a href="#" onclick="document.getElementById('fileInput3').click();">clicking here</a></p>
+                    <input type="file" id="fileInput3" multiple accept=".h5ad,.h5,.rds,.mtx,.tsv,.gz" style="display: none" onchange="handleFileSelection('fileInput3', 'droppedFileName3')" />
+                </div>
+            </div>
+            <div class="column third" id="container4" style="display:none;">
+                <div class="upload-container" ondrop="dropHandler(event, 'fileInput4', this);" ondragover="dragOverHandler(event, this);" ondragleave="dragLeaveHandler(event, this);">
+                    <i class="fas fa-upload upload-icon"></i>
+                    <p>Drag file(s) here to upload.</p>
+                    <p id="droppedFileName4"></p>
+                    <p>Alternatively, you can select files by <a href="#" onclick="document.getElementById('fileInput4').click();">clicking here</a></p>
+                    <input type="file" id="fileInput4" multiple accept=".h5ad,.h5,.rds,.mtx,.tsv,.gz" style="display: none" onchange="handleFileSelection('fileInput4', 'droppedFileName4')" />
+                </div>
+            </div>
+            <div class="column third" id="container5" style="display:none;">
+                <div class="upload-container" ondrop="dropHandler(event, 'fileInput5', this);" ondragover="dragOverHandler(event, this);" ondragleave="dragLeaveHandler(event, this);">
+                    <i class="fas fa-upload upload-icon"></i>
+                    <p>Drag file(s) here to upload.</p>
+                    <p id="droppedFileName5"></p>
+                    <p>Alternatively, you can select files by <a href="#" onclick="document.getElementById('fileInput5').click();">clicking here</a></p>
+                    <input type="file" id="fileInput5" multiple accept=".h5ad,.h5,.rds,.mtx,.tsv,.gz" style="display: none" onchange="handleFileSelection('fileInput5', 'droppedFileName5')" />
+                </div>
+            </div>
+            <div class="column third">
+                <button id="addUploadBtn" onclick="addUploadContainer();">+</button>
+            </div>
+        </div>
+
+        <div class="upload-btn">
+            <button onclick="uploadFilesToServer();">Upload</button>
+        </div>
+        <h3 class="plots-title" style="display: none;">Integration Results</h3>
+        <div class="plots-container"></div>
+        <div class="control-btns" style="display: none;">
+            <button id="exportBtn" class="custom-btn">Export</button>
+            <div id="exportOptionsPre" style="display: none;"></div>
+        </div>
+        <div id="myModal" class="modal">
+            <div class="modal-content">
+                <img id="modalIcon" src="" alt="">
+                <p id="modalText">Some text in the Modal..</p>
+                <div id="uuidContainer" style="display: none">
+                    <div class="uuid-display-container">
+                        <textarea id="uuidText" readonly onclick="this.focus();this.select()"></textarea>
+                        <button onclick="copyToClipboard()">Copy</button>
+                    </div>
+                </div>
+                <span class="close">&times;</span>
+            </div>
+        </div>
+
+        <div id="helpModal" class="modal_help">
+            <div class="modal_help-content">
+                <div class="modal_help-header">
+                    <span class="close" onclick="closeHelpModal()">&times;</span>
+                    <h2>Integration Help</h2>
+                </div>
+
+                <div class="modal_help-body">
+                    <div class="help-section">
+                        <p>
+                            Integration refers to the process of combining data from multiple sources or experiments to create a unified dataset. These sources could be different individuals, biological conditions, batches, technologies (e.g., different sequencing platforms), or tissues. Integration is crucial because it addresses the variability and technical noise that often arises when data is collected from separate experiments or labs, making it possible to compare and analyze the data as a whole.
+                        </p>
+                        
+                        <p>
+                            When performing scRNA-seq experiments across multiple conditions or batches, technical and biological factors can introduce unwanted variations into the data. This variation, often referred to as "batch effects" or "technical noise," can obscure the true biological signals you're interested in. Integration helps to account for these discrepancies, ensuring that cells from different sources can be compared more accurately.
+                        </p>
+                    </div>
+
+                    <div class="help-section">
+                        <p>
+                            To integrate your data with scExplorer go to Integration (1) section. Next upload or drag individual files in (2). If more than two datasets need to be integrated, click in (3). Next, indicate an Analysis Name (3), and Email (4) to notify when the analysis has finished, the Batch Correction Method to use during the integration (5), and indicate whether the dataset is Preprocessed (6). Finally, click on Upload (7) button to start the analysis.
+                        </p>
+                        <img src="/scexplorer/images/integration.png" alt="Integration Tutorial Image" />
+                    </div>
+                
+                    <!-- Batch correction methods info box -->
+                    <div class="info-box">
+                        <strong>Batch Correction Methods Available</strong>
+                        <p>
+                            scExplorer offers four different batch correction methods: Combat, Scanorama, BBKNN, and Harmony.
+                        </p>
+                        
+                        <p>
+                            <strong>Combat</strong> is a statistical method originally developed for correcting batch effects in microarray data but has been adapted for single-cell RNA-seq data. It adjusts for known batch effects by applying an empirical Bayes framework.
+                        </p>
+                        
+                        <p>
+                            <strong>Scanorama</strong> is a graph-based method designed specifically for single-cell RNA-seq data integration. It aligns multiple datasets by identifying mutual nearest neighbors (MNNs) between them, then stitches the datasets together based on these commonalities.
+                        </p>
+                        
+                        <p>
+                            <strong>BBKNN</strong> (Batch Balanced K-Nearest Neighbors) is a KNN-based batch correction method that operates in the context of UMAP or other dimensionality reduction techniques. It works by adjusting the neighbor search to be batch-aware, ensuring that each cell's neighbors come from different batches.
+                        </p>
+                        
+                        <p>
+                            <strong>Harmony</strong> is a fast and scalable batch correction method designed to handle complex multi-dataset integrations. It iteratively adjusts the cell embeddings in reduced-dimensional space to align cells across batches while preserving biological variation.
+                        </p>
+                        
+                        <p>
+                            Each one of these methods have advantages and disadvantages. Thus, we encourage users to explore all of these methods.
+                        </p>
+                    </div>
+
+                    <!-- Integration limits info -->
+                    <div class="help-section">
+                        <div style="background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%); border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 20px 0; position: relative;">
+                            <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #f59e0b, #d97706);"></div>
+                            <strong style="font-size: 1.1rem; color: #92400e; display: block; margin-bottom: 12px; position: relative; padding-left: 28px;">
+                                📊 Integration Capacity
+                            </strong>
+                            <p style="color: #0f172a; margin: 0; line-height: 1.6;">
+                                Currently, scExplorer can handle the integration of <strong>up to 5 datasets</strong> simultaneously in this integration stage. This limitation ensures optimal performance and reliable results for your batch correction analysis.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="help-modal-footer">
+                    <button onclick="closeHelpModal()">Close</button>
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+    <div id="loadingOverlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:100;">
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);">
+            <div style="color:white; font-size:20px; text-align:center;">
+                <p>Uploading...</p>
+                <img src="/scexplorer/images/loading3.svg" alt="Loading..." style="display:block; margin:auto;" />
+            </div>
+        </div>
+    </div>
+
+    <div id="resultsRush" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:100;">
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);">
+            <div style="color:white; font-size:20px; text-align:center;">
+                <p>Running Pipeline...</p>
+                <img src="/scexplorer/images/loading3.svg" alt="Running Pipeline..." style="display:block; margin:auto;" />
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = window.API_BASE_URL || "/backend";
+        (function(){const l=document.getElementById('api-docs-link');if(l&&window.API_BASE_URL) l.href = `${window.API_BASE_URL}/docs`;})();
+
+        function dragOverHandler(ev, containerEl) {
+            ev.preventDefault();
+            if (containerEl) containerEl.classList.add("drag-over");
+        }
+
+        function dragLeaveHandler(ev, containerEl) {
+            ev.preventDefault();
+            if (containerEl) containerEl.classList.remove("drag-over");
+        }
+
+        function dropHandler(ev, fileInputId, containerEl) {
+            ev.preventDefault();
+            if (containerEl) containerEl.classList.remove("drag-over");
+            const files = ev.dataTransfer.files;
+            document.getElementById(fileInputId).files = files;
+            const label = files.length === 1 ? files[0].name : `${files.length} files selected`;
+            document.getElementById("droppedFileName" + fileInputId.slice(-1)).innerText = label;
+        }
+
+        function handleFileSelection(fileInputId, droppedFileNameId) {
+            const fileInput = document.getElementById(fileInputId);
+            if (fileInput.files.length) {
+                const label = fileInput.files.length === 1 ? fileInput.files[0].name : `${fileInput.files.length} files selected`;
+                document.getElementById(droppedFileNameId).innerText = label;
+            }
+        }
+
+        function appendFilesToFormData(formData, key, files) {
+            for (let i = 0; i < files.length; i++) {
+                formData.append(key, files[i]);
+            }
+        }
+
+        function uploadFilesToServer() {
+            sessionStorage.clear();
+
+            const fileInput1 = document.getElementById("fileInput1");
+            const fileInput2 = document.getElementById("fileInput2");
+            const fileInput3 = document.getElementById("fileInput3");
+            const fileInput4 = document.getElementById("fileInput4");
+            const fileInput5 = document.getElementById("fileInput5");
+            const analysisName = document.getElementById("analysisName").value;
+            const email = document.getElementById("email").value;
+            const batchCorrectionMethod = document.getElementById("batchCorrectionMethod").value;
+            const preprocess = document.getElementById("preprocess").value;
+
+            if (!fileInput1.files[0] || !fileInput2.files[0]) {
+                alert("Please upload both files.");
+                return;
+            }
+
+            document.getElementById('loadingOverlay').style.display = 'block';
+
+            const formData = new FormData();
+            appendFilesToFormData(formData, 'dataset_1', fileInput1.files);
+            appendFilesToFormData(formData, 'dataset_2', fileInput2.files);
+            if (fileInput3 && fileInput3.files.length > 0) {
+                appendFilesToFormData(formData, 'dataset_3', fileInput3.files);  // Append only if files are present
+            }
+            if (fileInput4 && fileInput4.files.length > 0) {
+                appendFilesToFormData(formData, 'dataset_4', fileInput4.files);
+            }
+            if (fileInput5 && fileInput5.files.length > 0) {
+                appendFilesToFormData(formData, 'dataset_5', fileInput5.files);
+            }
+            formData.append("analysisName", analysisName);
+            formData.append("email", email);
+            formData.append("batch_correction_method", batchCorrectionMethod);
+
+            let uploadUrl = `${BASE_URL}/data_integration/?preprocess=${preprocess}`;
+
+            fetch(uploadUrl, {
+                method: "POST",
+                body: formData,
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(response.statusText);
+                }
+                return response.json();
+            })
+            .then(data => {
+                sessionStorage.setItem("uuid", data.uuid);
+                sessionStorage.setItem("integration_path", JSON.stringify(data.plots_path));
+
+                document.getElementById('loadingOverlay').style.display = 'none';
+
+                clearPlots();
+                if (data.plots_path && data.plots_path.length > 0) {
+                    document.querySelector(".plots-title").style.display = "block";
+                    data.plots_path.forEach((plotUrl, index) => {
+                        displayPlot(plotUrl, index + 1);
+                    });
+                    document.querySelector(".control-btns").style.display = "flex";
+                }
+            })
+            .catch(error => {
+                alert("Error uploading file: " + error.message);
+                document.getElementById('loadingOverlay').style.display = 'none';
+            });
+        }
+
+        function clearPlots() {
+            const container = document.querySelector(".plots-container");
+            container.innerHTML = '';
+        }
+
+        function displayPlot(plotUrl, index) {
+            plotUrl = `${BASE_URL}/${plotUrl}`;
+            const container = document.querySelector(".plots-container");
+
+            const column = document.createElement("div");
+            column.className = "column third";
+
+            const toolbar = document.createElement('div');
+            toolbar.className = 'plot-toolbar';
+            const openBtn = document.createElement('button');
+            openBtn.textContent = 'Open';
+            openBtn.onclick = () => window.open(plotUrl, '_blank');
+            toolbar.appendChild(openBtn);
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'plot-wrapper';
+
+            if (plotUrl.match(/\.(png|jpg|jpeg|svg)(\?.*)?$/i)) {
+                const img = document.createElement('img');
+                img.src = plotUrl;
+                img.className = 'plot-img';
+                img.alt = `Plot ${index}`;
+                img.style.marginTop = '10px';
+
+                let scale = 1;
+                const zoomIn = document.createElement('button');
+                zoomIn.textContent = '+';
+                const zoomOut = document.createElement('button');
+                zoomOut.textContent = '−';
+                const fitBtn = document.createElement('button');
+                fitBtn.textContent = 'Fit';
+
+                function applyScale() {
+                    img.style.transformOrigin = 'top left';
+                    img.style.transform = `scale(${scale})`;
+                }
+                zoomIn.onclick = () => { scale = Math.min(8, scale * 1.2); applyScale(); };
+                zoomOut.onclick = () => { scale = Math.max(0.2, scale / 1.2); applyScale(); };
+                fitBtn.onclick = () => { scale = 1; applyScale(); };
+
+                toolbar.appendChild(zoomIn);
+                toolbar.appendChild(zoomOut);
+                toolbar.appendChild(fitBtn);
+
+                wrapper.appendChild(img);
+            } else {
+                const iframe = document.createElement('iframe');
+                iframe.src = plotUrl;
+                iframe.className = 'plot-iframe';
+                iframe.loading = 'lazy';
+                wrapper.appendChild(iframe);
+            }
+
+            column.appendChild(toolbar);
+            column.appendChild(wrapper);
+            container.appendChild(column);
+        }
+
+        function addUploadContainer() {
+            const containers = ['container3','container4','container5'];
+            for (let i = 0; i < containers.length; i++) {
+                const el = document.getElementById(containers[i]);
+                if (el && el.style.display === 'none') {
+                    el.style.display = 'block';
+                    if (i === containers.length - 1) {
+                        document.getElementById('addUploadBtn').style.display = 'none';
+                    }
+                    return;
+                }
+            }
+            document.getElementById('addUploadBtn').style.display = 'none';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const resizer = document.querySelector('.resizer');
+            let isResizing = false;
+
+            resizer.addEventListener('mousedown', function(event) {
+                isResizing = true;
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', function() {
+                    isResizing = false;
+                    document.removeEventListener('mousemove', handleMouseMove);
+                });
+            });
+
+            function handleMouseMove(event) {
+                if (isResizing) {
+                    const newWidth = event.clientX;
+                    document.querySelector('.sidebar').style.width = newWidth + 'px';
+                    document.querySelector('section').style.marginLeft = newWidth + 'px';
+                }
+            }
+        });
+
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const sections = document.querySelectorAll('section');
+            const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+            const showSidebarBtn = document.getElementById('showSidebarBtn');
+
+            if (sidebar.classList.contains('hidden')) {
+                sidebar.classList.remove('hidden');
+                sections.forEach(section => {
+                    section.style.marginLeft = '250px';
+                    section.style.width = '80%';
+                });
+                toggleSidebarBtn.style.display = 'none';
+                showSidebarBtn.style.display = 'block';
+            } else {
+                sidebar.classList.add('hidden');
+                sections.forEach(section => {
+                    section.style.marginLeft = '150px';
+                    section.style.width = '85%';
+                });
+                toggleSidebarBtn.style.display = 'none';
+                showSidebarBtn.style.display = 'block';
+            }
+        }
+
+        function showSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const sections = document.querySelectorAll('section');
+            const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+            const showSidebarBtn = document.getElementById('showSidebarBtn');
+
+            sidebar.classList.remove('hidden');
+            sections.forEach(section => {
+                section.style.marginLeft = '250px';
+                section.style.width = '80%';
+            });
+            toggleSidebarBtn.style.display = 'block';
+            showSidebarBtn.style.display = 'none';
+        }
+        document.getElementById('exportBtn').addEventListener('click', function() {
+            const exportOptions = document.getElementById('exportOptionsPre');
+            exportOptions.style.display = exportOptions.style.display === 'none' ? 'block' : 'none';
+
+            exportOptions.innerHTML = '';
+
+            const options = [
+                { name: 'Export for Seurat', action: exportForSeurat },
+                { name: 'Export for Scanpy', action: exportForScanpy }
+            ];
+
+            const ul = document.createElement('ul');
+            options.forEach(opt => {
+                const li = document.createElement('li');
+                li.textContent = opt.name;
+                li.classList.add('export-option');
+                li.addEventListener('click', function() {
+                    opt.action();
+                    exportOptions.style.display = 'none';
+                });
+                ul.appendChild(li);
+            });
+
+            exportOptions.appendChild(ul);
+        });
+        function openHelpModal() {
+            document.getElementById('helpModal').style.display = 'block';
+        }
+    
+        function closeHelpModal() {
+            document.getElementById('helpModal').style.display = 'none';
+        }
+        function exportForSeurat() {
+            showLoadingOverlay('Exporting for Seurat...');
+
+            const uuid = sessionStorage.getItem("uuid");
+            if (!uuid) {
+                console.error("UUID not found in session storage.");
+                return;
+            }
+
+            const url = `${BASE_URL}/seurat_export?uuid=${uuid}`;
+            const options = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ uuid: uuid })
+            };
+
+            fetch(url, options)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to export file');
+                    hideLoadingOverlay();
+                    return response.blob();
+                })
+                .then(blob => {
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = `${uuid}.rds`; 
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(downloadUrl); 
+                })
+                .catch(error => {
+                    console.error("Error during file export:", error);
+                    hideLoadingOverlay();
+                });
+        }
+
+        function exportForScanpy() {
+            showLoadingOverlay('Exporting for Scanpy...');
+
+            const uuid = sessionStorage.getItem("uuid");
+            if (!uuid) {
+                console.error("UUID not found in session storage.");
+                return;
+            }
+
+            const url = `${BASE_URL}/scanpy_export?uuid=${uuid}`;
+            const options = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ uuid: uuid })
+            };
+
+            fetch(url, options)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to export file');
+
+                    return response.blob();
+                })
+                .then(blob => {
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = `${uuid}.h5ad`; 
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(downloadUrl); 
+                    hideLoadingOverlay();
+
+                })
+                .catch(error => {
+                    hideLoadingOverlay();
+
+                    console.error("Error during file export:", error);
+                    
+                });
+        }
+
+        function showLoadingOverlay(message) {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingText = document.querySelector('#loadingOverlay p');
+            loadingText.textContent = message;
+            loadingOverlay.style.display = 'block';
+        }
+
+        function hideLoadingOverlay() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        // Download Plot button removed on Integration page
+
+        function showLoadingOverlay(message) {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingText = document.querySelector('#loadingOverlay p');
+            loadingText.textContent = message;
+            loadingOverlay.style.display = 'block';
+        }
+
+        function hideLoadingOverlay() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+
+
+        // Close the modal when clicking outside of the modal
+        window.onclick = function(event) {
+            const modal = document.getElementById('helpModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        };
+    </script>
+</body>
+
+</html>

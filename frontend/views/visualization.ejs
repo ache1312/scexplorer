@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>scExplorer</title>
+    <link rel="icon" href="/scexplorer/images/logo_sc_explorer_v1.ico" type="image/x-icon">
+    <link rel="stylesheet" href="/scexplorer/css/styles.css" />
+    <link rel="stylesheet" href="/scexplorer/css/theme-popup.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <script src="/scexplorer/js/help-enhancements.js"></script>
+    <script src="/config.js"></script>
+    <script src="/scexplorer/js/api-base.js"></script>
+</head>
+
+<body>
+    <!-- ───────────── Sidebar ───────────── -->
+    <aside class="sidebar">
+        <img src="/scexplorer/images/logo_sc_explorer_v1.png" alt="scExplorer logo" class="sidebar-logo" />
+        <h1 class="sidebar-title">scExplorer</h1>
+        <ul>
+            <li><a href="/scexplorer/"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="/scexplorer/integration"><i class="fas fa-layer-group"></i>Integration</a></li>
+            <li><a href="/scexplorer/upload"><span class="step-number">0</span> <i class="fas fa-upload"></i> Upload</a></li>
+            <li><a href="/scexplorer/preprocess"><span class="step-number">1</span> <i class="fas fa-cogs"></i> Preprocess</a></li>
+            <li><a href="/scexplorer/embedding"><span class="step-number">2</span> <i class="fas fa-vector-square"></i> Embedding</a></li>
+            <li><a href="/scexplorer/dea"><span class="step-number">3</span> <i class="fas fa-chart-bar"></i> DEA</a></li>
+            <li><a href="/scexplorer/visualization"><span class="step-number">4</span> <i class="fas fa-chart-area"></i> Visualization</a></li>
+            <li><a href="/scexplorer/heatmap"><span class="step-number">5</span> <i class="fas fa-th"></i> Heatmap</a></li>
+            <li><a href="/scexplorer/results"><span class="step-number">6</span> <i class="fas fa-poll"></i> Results</a></li>
+        </ul>
+        <div class="sidebar-divider"></div>
+        <ul class="documentation-section">
+            <li><a id="api-docs-link" href="https://apps.cienciavida.org/backend/docs" target="_blank"><i class="fas fa-book"></i> API Documentation</a></li>
+        </ul>
+        <div class="resizer"></div>
+        <i id="toggleSidebarBtn" class="fas fa-angle-double-left white-icon" onclick="toggleSidebar()"></i>
+    </aside>
+    <button id="showSidebarBtn" class="show-sidebar-btn" onclick="toggleSidebar()"><i class="fas fa-angle-double-right"></i></button>
+
+    <!-- ───────────── Header / Help ───────────── -->
+    <section>
+        <div id="loadingOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:100;">
+            <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);">
+                <div style="color:white; font-size:20px; text-align:center;">
+                    <p>Visualization...</p>
+                    <img src="/scexplorer/images/loading3.svg" alt="Loading..." style="display:block; margin:auto;"/>
+                </div>
+            </div>
+        </div>
+
+        <div class="header-buttons">
+            <button onclick="openHelpModal()">Help</button>
+        </div>
+        <h2><i class="fas fa-chart-area"></i> Visualization</h2>
+        <div id="analysisInfoBox"></div>
+    </section>
+
+    <!-- ───────────── Help Modal ───────────── -->
+    <div id="helpModal" class="modal_help">
+        <div class="modal_help-content">
+            <div class="modal_help-header">
+                <span class="close" onclick="closeHelpModal()">&times;</span>
+                <h2>Visualization Help</h2>
+            </div>
+
+            <div class="modal_help-body">
+                <!-- Visualization Overview Section -->
+                <div class="help-section">
+                    <h3 style="color: #374151; font-size: 1.2rem; margin-bottom: 16px; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px;">Gene Expression Visualization</h3>
+                    <p>
+                        The visualization module allows you to explore gene expression patterns across your single-cell dataset by plotting specific genes of interest in reduced dimensional space (UMAP or PCA).
+                    </p>
+                </div>
+
+                <!-- Step-by-Step Guide Section -->
+                <div class="help-section">
+                    <h3 style="color: #374151; font-size: 1.2rem; margin-bottom: 16px; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px;">Step-by-Step Visualization Process</h3>
+                    
+                    <ul>
+                        <li><strong>(1) Select Dimension Reduction:</strong> Choose between UMAP or PCA for your visualization space</li>
+                        <li><strong>(2) Search Genes:</strong> Type the genes of interest in the search field</li>
+                        <li><strong>(3) Review Selection:</strong> The selected genes will appear on the right side for confirmation</li>
+                        <li><strong>(4) Run Analysis:</strong> Click on Run to start the visualization process</li>
+                        <li><strong>(5) Continue:</strong> Click on Continue to Results to proceed to the download section</li>
+                    </ul>
+
+                    <img src="/scexplorer/images/visualization_1.png" alt="Visualization Setup Tutorial Image" />
+                </div>
+
+
+                <!-- Visualization Results Section -->
+                <div class="help-section">
+                    <h3 style="color: #374151; font-size: 1.2rem; margin-bottom: 16px; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px;">Understanding Visualization Results</h3>
+                    
+                    <p>
+                        After running the visualization, you will see gene expression plots overlaid on your chosen dimensional reduction space. Each plot shows:
+                    </p>
+                    
+                    <ul>
+                        <li><strong>Cell positions:</strong> Based on UMAP or PCA coordinates</li>
+                        <li><strong>Expression levels:</strong> Represented by color intensity</li>
+                        <li><strong>Spatial patterns:</strong> Revealing which cell populations express your genes of interest</li>
+                    </ul>
+                    
+                    <p>
+                        This spatial representation helps identify cell types, validate clustering results, and understand the biological context of your single-cell data.
+                    </p>
+
+                    <img src="/scexplorer/images/post_vis.png" alt="Visualization Results Tutorial Image" />
+                </div>
+
+                <!-- Gene Observations (Var) Section -->
+                <div class="help-section">
+                    <h3 style="color: #374151; font-size: 1.2rem; margin-bottom: 16px; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px;">Gene Observations Plots</h3>
+                    <p>
+                        Use the <strong>Gene Observations</strong> container to color the embedding by per-gene metadata stored in <code>var</code> (e.g., total counts per gene, HVG flags). Configure:
+                    </p>
+                    <ul>
+                        <li><strong>(1) Dimension Reduction:</strong> Choose UMAP or PCA as the display space.</li>
+                        <li><strong>(2) Search:</strong> Filter available <code>var</code> columns by name.</li>
+                        <li><strong>(3) Select columns:</strong> Pick one or more <code>var</code> fields to visualize.</li>
+                        <li><strong>(4) Run:</strong> Generate one plot per selected column.</li>
+                    </ul>
+                    <p>
+                        Each resulting plot colors cells according to the selected per-gene metric aggregated over the embedding. Use this to inspect HVG selection, gene-level filters, or feature-wide summaries.
+                    </p>
+                    <img src="/scexplorer/images/visualization_2.png" alt="Gene Observations Table" />
+                </div>
+
+                <!-- Cell Observations (Obs) Section -->
+                <div class="help-section">
+                    <h3 style="color: #374151; font-size: 1.2rem; margin-bottom: 16px; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px;">Cell Observations Plots</h3>
+                    <p>
+                        Use the <strong>Cell Observations</strong> container to color the embedding by per-cell metadata stored in <code>obs</code> (e.g., total counts, percent mitochondrial, Leiden cluster, user labels). Configure:
+                    </p>
+                    <ul>
+                        <li><strong>(1) Dimension Reduction:</strong> Choose UMAP or PCA as the display space.</li>
+                        <li><strong>(2) Search column:</strong> Filter available <code>obs</code> columns by name.</li>
+                        <li><strong>(3) Select columns:</strong> Pick one or more <code>obs</code> fields to visualize (numeric or categorical).</li>
+                        <li><strong>(4) Run:</strong> Generate one plot per selected column.</li>
+                    </ul>
+                    <p>
+                        Plots use continuous scales for numeric columns and discrete palettes for categorical columns (e.g., clusters/labels). This is ideal for QC review and for verifying labeling decisions before downstream analyses.
+                    </p>
+                    <img src="/scexplorer/images/visualization_3.png" alt="Cell Observations Table" />
+                </div>
+            </div>
+
+            <div class="help-modal-footer">
+                <button onclick="closeHelpModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ───────────── Genes Visualization ───────────── -->
+    <div id="GenesVisualization" class="embeding-box">
+        <h3>Genes Visualization</h3>
+        <div class="params-row">
+            <div class="input-group">
+                <label for="dim_red">Dimension Reduction:
+                    <i class="fas fa-info-circle" style="color:#000000; cursor:pointer;">
+                        <span class="tooltip">Select linear or non-linear dimensional reduction.</span>
+                    </i>
+                </label>
+                <select id="dim_red">
+                    <option value="X_umap">UMAP</option>
+                    <option value="X_pca">PCA</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label for="geneSearch">Search Gene:</label>
+                <input type="text" id="geneSearch" placeholder="Type to filter genes" />
+            </div>
+
+            <div class="input-group">
+                <label for="genes">Select Genes:</label>
+                <select id="genes" multiple size="6"></select>
+            </div>
+
+            <div class="input-group" id="selectedGenesContainer"></div>
+
+            <div class="header-buttons">
+                <button id="submitGenes">Run</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="GenesResults" class="embeding-box" style="display:none;">
+        <h3>Gene Expression Results</h3>
+        <div id="GenesContainer" class="plots-container"></div>
+    </div>
+
+    <!-- ───────────── Var Visualization (NEW) ───────────── -->
+    <div id="VarVisualization" class="embeding-box">
+        <h3>Gene Observations</h3>
+        <div class="params-row">
+            <div class="input-group">
+                <label for="var_dim_red">Dimension Reduction:</label>
+                <select id="var_dim_red">
+                    <option value="X_umap">UMAP</option>
+                    <option value="X_pca">PCA</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label for="varSearch">Search column:</label>
+                <input type="text" id="varSearch" placeholder="Type to filter columns" />
+            </div>
+
+            <div class="input-group">
+                <label for="vars">Select columns:</label>
+                <select id="vars" multiple size="6"></select>
+            </div>
+            <div class="input-group" id="selectedVarsContainer"></div>
+
+            <div class="header-buttons">
+                <button id="submitVar">Run</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="VarResults" class="embeding-box" style="display:none;">
+        <h3>Gene Observations Results</h3>
+        <div id="VarContainer" class="plots-container"></div>
+    </div>
+
+    <!-- ───────────── Cell Observations (NEW) ───────────── -->
+    <div id="ObsVisualization" class="embeding-box">
+        <h3>Cell Observations</h3>
+        <div class="params-row">
+            <div class="input-group">
+                <label for="obs_dim_red">Dimension Reduction:</label>
+                <select id="obs_dim_red">
+                    <option value="X_umap">UMAP</option>
+                    <option value="X_pca">PCA</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label for="obsSearch">Search column:</label>
+                <input type="text" id="obsSearch" placeholder="Type to filter columns" />
+            </div>
+            <div class="input-group">
+                <label for="obs">Select columns:</label>
+                <select id="obs" multiple size="6"></select>
+            </div>
+            <div class="input-group" id="selectedObsContainer"></div>
+            <div class="header-buttons">
+                <button id="submitObs">Run</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="ObsResults" class="embeding-box" style="display:none;">
+        <h3>Cell Observations Results</h3>
+        <div id="ObsContainer" class="plots-container"></div>
+    </div>
+
+    <!-- Centered Button Container -->
+    <div class="button-container-results" id="visualizationButtons" style="margin: 30px 200px; padding: 0; display: none;">
+        <div class="button-row" style="display: flex; justify-content: flex-end; align-items: center; gap: 20px; flex-wrap: wrap;">
+            <div class="upload-btn">
+                <button id="continueToResults" style="padding: 8px 16px; font-size: 0.9rem; min-width: 160px; line-height: 1.2; display: flex; align-items: center; justify-content: center; height: 36px;">Continue to Heatmap</button>
+            </div>
+            <div class="bottom-buttons" style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
+                <div id="exportOptions" style="display: none; position: relative; background: white; border: 1px solid #d1d5db; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); z-index: 10; margin-bottom: 8px; min-width: 200px;"></div>
+                <button id="exportData" class="custom-btn" style="padding: 8px 16px; font-size: 0.9rem; min-width: 100px; line-height: 1.2; display: flex; align-items: center; justify-content: center; height: 36px;">Export</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ───────────── Script ───────────── -->
+    <script>
+    /* ---------- Utility: loading overlay ---------- */
+    function showLoadingOverlay(msg) {
+        const overlay = document.getElementById('loadingOverlay');
+        overlay.querySelector('p').textContent = msg;
+        overlay.style.display = 'block';
+    }
+    function hideLoadingOverlay() {
+        document.getElementById('loadingOverlay').style.display = 'none';
+    }
+
+    /* ---------- Globals ---------- */
+    const BASE_URL = window.API_BASE_URL || "/backend";
+    const apiDocsLink = document.getElementById('api-docs-link');
+    if (apiDocsLink && window.API_BASE_URL) apiDocsLink.href = `${window.API_BASE_URL}/docs`;
+
+    /* ---------- Initialization ---------- */
+    document.addEventListener("DOMContentLoaded", initializeApp);
+
+    function initializeApp() {
+        const uuid = sessionStorage.getItem("uuid");
+        const analysisName = sessionStorage.getItem("analysisName");
+        document.getElementById("analysisInfoBox").innerHTML =
+            `Analysis Name: ${analysisName}<br>UUID: ${uuid} <i class="fas fa-copy" onclick="copyToClipboard('${uuid}')" style="cursor:pointer; font-size:14px;"></i>`;
+
+        if (uuid) {
+            fetchGeneNames(uuid);
+            fetchVarNames(uuid);
+            fetchObsNames(uuid);
+            setupGeneSearch();
+            setupVarSearch();
+            setupObsSearch();
+            setupGeneSelection();
+            setupVarSelection();
+            setupObsSelection();
+            loadPlotsOnRefresh();
+        }
+    }
+
+    /* ---------- Clipboard ---------- */
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).catch(err => console.error('Copy failed:', err));
+    }
+
+    /* ---------- Gene name retrieval ---------- */
+    function fetchGeneNames(uuid) {
+        showLoadingOverlay('Loading gene names…');
+        fetch(`${BASE_URL}/gene_names?uuid=${uuid}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(r => r.ok ? r.json() : Promise.reject('Network error'))
+        .then(populateGeneOptions)
+        .catch(err => console.error(err))
+        .finally(hideLoadingOverlay);
+    }
+    function populateGeneOptions(genes) {
+        const sel = document.getElementById('genes');
+        sel.innerHTML = '';
+        genes.forEach(g => {
+            const o = document.createElement('option'); o.value = o.textContent = g;
+            sel.appendChild(o);
+        });
+    }
+
+    /* ---------- Var column retrieval (NEW) ---------- */
+   
+
+    function fetchVarNames(uuid) {
+      fetch(`${BASE_URL}/var_names?uuid=${encodeURIComponent(uuid)}`, {
+        method: 'POST'
+      })
+        .then(resp => {
+          if (!resp.ok) throw new Error('Var fetch failed');
+          return resp.json();
+        })
+        .then(cols => populateVarOptions(cols))
+        .catch(err => console.error("Var fetch error:", err));
+    }
+
+
+    function populateVarOptions(cols) {
+        const sel = document.getElementById('vars');
+        sel.innerHTML = '';
+        cols.forEach(c => {
+            const o = document.createElement('option'); o.value = o.textContent = c;
+            sel.appendChild(o);
+        });
+    }
+
+    /* ---------- Obs column retrieval (NEW) ---------- */
+    function fetchObsNames(uuid) {
+      fetch(`${BASE_URL}/obs_names?uuid=${encodeURIComponent(uuid)}`, {
+        method: 'POST'
+      })
+        .then(resp => {
+          if (!resp.ok) throw new Error('Obs fetch failed');
+          return resp.json();
+        })
+        .then(cols => populateObsOptions(cols))
+        .catch(err => console.error("Obs fetch error:", err));
+    }
+
+    function populateObsOptions(cols) {
+        const sel = document.getElementById('obs');
+        sel.innerHTML = '';
+        cols.forEach(c => {
+            const o = document.createElement('option'); o.value = o.textContent = c;
+            sel.appendChild(o);
+        });
+    }
+
+    /* ---------- Search filters ---------- */
+    function setupGeneSearch() {
+        document.getElementById('geneSearch').addEventListener('input', e => {
+            const term = e.target.value.toLowerCase();
+            Array.from(document.getElementById('genes').options).forEach(o =>
+                o.style.display = o.text.toLowerCase().includes(term) ? '' : 'none');
+        });
+    }
+    function setupVarSearch() {
+        document.getElementById('varSearch').addEventListener('input', e => {
+            const term = e.target.value.toLowerCase();
+            Array.from(document.getElementById('vars').options).forEach(o =>
+                o.style.display = o.text.toLowerCase().includes(term) ? '' : 'none');
+        });
+    }
+    function setupObsSearch() {
+        document.getElementById('obsSearch').addEventListener('input', e => {
+            const term = e.target.value.toLowerCase();
+            Array.from(document.getElementById('obs').options).forEach(o =>
+                o.style.display = o.text.toLowerCase().includes(term) ? '' : 'none');
+        });
+    }
+
+    /* ---------- Gene multi-select ---------- */
+    function setupGeneSelection() {
+        const sel = document.getElementById('genes');
+        sel.addEventListener('mousedown', ev => {
+            if (ev.target.tagName !== 'OPTION') return;
+            ev.preventDefault();
+            const opt = ev.target;
+            if (!opt.selected && sel.selectedOptions.length >= 6) { alert('Max 6 genes'); return; }
+            opt.selected = !opt.selected;
+            updateSelectedGenesDisplay();
+        });
+    }
+    function updateSelectedGenesDisplay() {
+        const cont = document.getElementById('selectedGenesContainer');
+        cont.innerHTML = '';
+        Array.from(document.getElementById('genes').selectedOptions).forEach(opt => {
+            const div = document.createElement('div'); div.className = 'selected-gene'; div.textContent = opt.value;
+            const x = document.createElement('span'); x.textContent = '×'; x.className = 'close';
+            x.onclick = () => { opt.selected = false; updateSelectedGenesDisplay(); };
+            div.appendChild(x); cont.appendChild(div);
+        });
+    }
+
+    /* ---------- Var multi-select ---------- */
+    function setupVarSelection() {
+        const sel = document.getElementById('vars');
+        sel.addEventListener('mousedown', ev => {
+            if (ev.target.tagName !== 'OPTION') return;
+            ev.preventDefault();
+            const opt = ev.target;
+            if (!opt.selected && sel.selectedOptions.length >= 6) { alert('Max 6 columns'); return; }
+            opt.selected = !opt.selected;
+            updateSelectedVarsDisplay();
+        });
+    }
+    function updateSelectedVarsDisplay() {
+        const cont = document.getElementById('selectedVarsContainer');
+        cont.innerHTML = '';
+        Array.from(document.getElementById('vars').selectedOptions).forEach(opt => {
+            const div = document.createElement('div'); div.className = 'selected-gene'; div.textContent = opt.value;
+            const x = document.createElement('span'); x.textContent = '×'; x.className = 'close';
+            x.onclick = () => { opt.selected = false; updateSelectedVarsDisplay(); };
+            div.appendChild(x); cont.appendChild(div);
+        });
+    }
+
+    /* ---------- Obs multi-select ---------- */
+    function setupObsSelection() {
+        const sel = document.getElementById('obs');
+        sel.addEventListener('mousedown', ev => {
+            if (ev.target.tagName !== 'OPTION') return;
+            ev.preventDefault();
+            const opt = ev.target;
+            if (!opt.selected && sel.selectedOptions.length >= 6) { alert('Max 6 columns'); return; }
+            opt.selected = !opt.selected;
+            updateSelectedObsDisplay();
+        });
+    }
+    function updateSelectedObsDisplay() {
+        const cont = document.getElementById('selectedObsContainer');
+        cont.innerHTML = '';
+        Array.from(document.getElementById('obs').selectedOptions).forEach(opt => {
+            const div = document.createElement('div'); div.className = 'selected-gene'; div.textContent = opt.value;
+            const x = document.createElement('span'); x.textContent = '×'; x.className = 'close';
+            x.onclick = () => { opt.selected = false; updateSelectedObsDisplay(); };
+            div.appendChild(x); cont.appendChild(div);
+        });
+    }
+
+    /* ---------- Show visualization buttons ---------- */
+    function showVisualizationButtons() {
+        document.getElementById('visualizationButtons').style.display = 'block';
+    }
+
+    /* ---------- Submit Gene Visualization ---------- */
+    document.getElementById('submitGenes').addEventListener('click', () => {
+        const uuid = sessionStorage.getItem('uuid');
+        const dim = document.getElementById('dim_red').value;
+        const genes = Array.from(document.getElementById('genes').selectedOptions).map(o => o.value);
+        if (!genes.length) return alert('Select at least one gene');
+        showLoadingOverlay('Running…');
+
+        fetch(`${BASE_URL}/genes_visualization/`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({file_uuid:uuid, dim_red:dim, gene_list:genes})
+        })
+        .then(r=>r.ok?r.json():Promise.reject('Gene vis failed'))
+        .then(renderGenePlots)
+        .catch(console.error)
+        .finally(hideLoadingOverlay);
+    });
+    function renderGenePlots(paths) {
+        const cont = document.getElementById('GenesContainer'); cont.innerHTML='';
+        paths.forEach((p,i)=>{
+            if(i%2===0){ const row=document.createElement('div'); row.className='plot-row'; cont.appendChild(row);}
+            const iframe=document.createElement('iframe');
+            iframe.src=`${BASE_URL}/genes_vis/${p}?_=${Date.now()}`;
+            iframe.className='plot-iframe'; iframe.style.width='49%'; iframe.style.height='500px';
+            cont.lastChild.appendChild(iframe);
+        });
+        document.getElementById('GenesResults').style.display='block';
+        showVisualizationButtons();
+    }
+
+    /* ---------- Submit Var Visualization (NEW) ---------- */
+    document.getElementById('submitVar').addEventListener('click', () => {
+        const uuid = sessionStorage.getItem('uuid');
+        const dim  = document.getElementById('var_dim_red').value;
+        const vars = Array.from(document.getElementById('vars').selectedOptions).map(o => o.value);
+        if(!vars.length) return alert('Select at least one column');
+        showLoadingOverlay('Running…');
+
+        fetch(`${BASE_URL}/var_visualization/`,{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({file_uuid:uuid, dim_red:dim, var_keys:vars})
+        })
+        .then(r=>r.ok?r.json():Promise.reject('Var vis failed'))
+        .then(renderVarPlots)
+        .catch(console.error)
+        .finally(hideLoadingOverlay);
+    });
+    function renderVarPlots(paths){
+        const cont=document.getElementById('VarContainer'); cont.innerHTML='';
+        paths.forEach((p,i)=>{
+            const iframe=document.createElement('iframe');
+            iframe.src=`${BASE_URL}/genes_vis/${p}?_=${Date.now()}`;
+            iframe.className='plot-iframe'; iframe.style.width='49%'; iframe.style.height='500px';
+            cont.appendChild(iframe);
+        });
+        document.getElementById('VarResults').style.display='block';
+        showVisualizationButtons();
+    }
+
+    /* ---------- Submit Obs Visualization (NEW) ---------- */
+    document.getElementById('submitObs').addEventListener('click', () => {
+        const uuid = sessionStorage.getItem('uuid');
+        const dim  = document.getElementById('obs_dim_red').value;
+        const obs  = Array.from(document.getElementById('obs').selectedOptions).map(o => o.value);
+        if(!obs.length) return alert('Select at least one column');
+        showLoadingOverlay('Running…');
+
+        fetch(`${BASE_URL}/obs_visualization/`,{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({file_uuid:uuid, dim_red:dim, obs_keys:obs})
+        })
+        .then(r=>r.ok?r.json():Promise.reject('Obs vis failed'))
+        .then(renderObsPlots)
+        .catch(console.error)
+        .finally(hideLoadingOverlay);
+    });
+    function renderObsPlots(paths){
+        const cont=document.getElementById('ObsContainer'); cont.innerHTML='';
+        paths.forEach((p,i)=>{
+            const iframe=document.createElement('iframe');
+            iframe.src=`${BASE_URL}/genes_vis/${p}?_=${Date.now()}`;
+            iframe.className='plot-iframe'; iframe.style.width='49%'; iframe.style.height='500px';
+            cont.appendChild(iframe);
+        });
+        document.getElementById('ObsResults').style.display='block';
+        showVisualizationButtons();
+    }
+
+    /* ---------- Restore plots on refresh ---------- */
+    function loadPlotsOnRefresh() {
+        const storedPaths = sessionStorage.getItem('plotPaths');
+        if (!storedPaths) return;
+        const paths=JSON.parse(storedPaths);
+        renderGenePlots(paths);
+    }
+
+    /* ---------- Export buttons, continue, help modal ---------- */
+    document.getElementById('continueToResults').onclick=()=>location.href='/scexplorer/heatmap';
+
+    document.getElementById('exportData').onclick=function(){
+        const box=document.getElementById('exportOptions');
+        box.style.display=box.style.display==='none'?'block':'none'; box.innerHTML='';
+        const ul=document.createElement('ul');
+        ul.style.cssText='list-style:none;margin:0;padding:8px 0';
+        [
+            {label:'Export for Seurat',cb:exportForSeurat},
+            {label:'Export for Scanpy',cb:exportForScanpy}
+        ].forEach(o=>{
+            const li=document.createElement('li'); 
+            li.textContent=o.label;
+            li.style.cssText='padding:8px 16px;cursor:pointer;color:#374151;font-size:0.9rem;border-bottom:1px solid #f3f4f6';
+            li.onmouseenter=function(){this.style.backgroundColor='#f9fafb'};
+            li.onmouseleave=function(){this.style.backgroundColor='transparent'};
+            li.onclick=()=>{o.cb(); box.style.display='none';}; 
+            ul.appendChild(li);
+        });
+        box.appendChild(ul);
+    };
+    function exportForSeurat(){ exportGeneric('/seurat_export','rds'); }
+    function exportForScanpy(){ exportGeneric('/scanpy_export','h5ad'); }
+    function exportGeneric(endpoint,ext){
+        showLoadingOverlay('Exporting…');
+        const uuid=sessionStorage.getItem('uuid');
+        fetch(`${BASE_URL}${endpoint}?uuid=${uuid}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uuid})})
+        .then(r=>r.ok?r.blob():Promise.reject('Export failed'))
+        .then(blob=>{
+            const url=URL.createObjectURL(blob);
+            const a=document.createElement('a'); a.href=url; a.download=`${uuid}.${ext}`;
+            document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+        })
+        .catch(console.error)
+        .finally(hideLoadingOverlay);
+    }
+
+    /* ---------- Help modal handling ---------- */
+    function openHelpModal(){document.getElementById('helpModal').style.display='block';}
+    function closeHelpModal(){document.getElementById('helpModal').style.display='none';}
+    window.onclick=ev=>{if(ev.target===document.getElementById('helpModal')) closeHelpModal();};
+
+    /* ---------- Sidebar toggle ---------- */
+    function toggleSidebar() {
+        const sb=document.querySelector('.sidebar'); const btn=document.getElementById('toggleSidebarBtn'); const showBtn=document.getElementById('showSidebarBtn');
+        const sections=document.querySelectorAll('section,.embeding-box,.params-row,.plots-container,.button-container-results');
+        const themeContainer = document.querySelector('.theme-selector-container');
+        if(sb.classList.contains('hidden')){
+            sb.classList.remove('hidden'); sections.forEach(s=>{s.style.marginLeft='250px'; s.style.width='80%';});
+            if (themeContainer) { themeContainer.style.marginLeft='220px'; themeContainer.style.width='83%'; }
+            btn.style.display='block'; showBtn.style.display='none';
+        }else{
+            sb.classList.add('hidden'); sections.forEach(s=>{s.style.marginLeft='150px'; s.style.width='80%';});
+            if (themeContainer) { themeContainer.style.marginLeft='20px'; themeContainer.style.width='95%'; }
+            btn.style.display='none'; showBtn.style.display='block';
+        }
+    }
+
+    /* ---------- Theme Integration ---------- */
+    window.regenerateAllPlots = function() {
+        // Regenerate gene plots if they exist
+        const storedPaths = sessionStorage.getItem('plotPaths');
+        if (storedPaths) {
+            const paths = JSON.parse(storedPaths);
+            renderGenePlots(paths);
+        }
+        
+        // Regenerate var plots if they exist
+        const varContainer = document.getElementById('VarContainer');
+        if (varContainer && varContainer.innerHTML.trim() !== '') {
+            // Re-trigger var visualization with current settings
+            document.getElementById('submitVar').click();
+        }
+        
+        // Regenerate obs plots if they exist
+        const obsContainer = document.getElementById('ObsContainer');
+        if (obsContainer && obsContainer.innerHTML.trim() !== '') {
+            // Re-trigger obs visualization with current settings
+            document.getElementById('submitObs').click();
+        }
+    };
+    </script>
+    
+    <!-- Theme Manager Script -->
+    <script src="/scexplorer/js/theme-manager-new.js"></script>
+</body>
+</html>

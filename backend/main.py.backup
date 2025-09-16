@@ -1,0 +1,3549 @@
+import asyncio
+import ast
+import glob
+import gzip
+import json
+import pandas as pd
+import rpy2.robjects as robjects
+import re
+import os
+import scanpy as sc
+import shutil
+import sqlite3
+import subprocess
+import uuid
+import zipfile
+from datetime import datetime
+
+from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException,Form,Query,Request
+from fastapi.responses import FileResponse,JSONResponse
+from starlette.middleware.cors import CORSMiddleware
+from pydantic import ValidationError
+from utils import  upload_notification
+from plot_themes import theme_manager, PlotTheme, create_theme_preview
+from validations import ProcessDataParams,EmbeddingParams,PcaParams,VisualizationInput,VarVisualizationInput,PlotThemeRequest,VisualizationWithTheme
+from typing import Optional, List, Dict,Union
+
+from starlette.middleware.base import BaseHTTPMiddleware
+
+
+# Middleware que recorta el prefijo /backend y fija root_path
+class PrefixStripMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, prefix: str = "/backend"):
+        super().__init__(app)
+        self.prefix = prefix
+
+    async def dispatch(self, request: Request, call_next):
+        path = request.scope.get("path", "")
+        if path == self.prefix:
+            # exacto /backend -> convertir a "/"
+            request.scope["root_path"] = self.prefix
+            request.scope["path"] = "/"
+        elif path.startswith(self.prefix + "/"):
+            # /lo-que-sea -> quitar prefijo
+            request.scope["root_path"] = self.prefix
+            request.scope["path"] = path[len(self.prefix):] or "/"
+        return await call_next(request)
+
+
+app = FastAPI(
+    title="Single-Cell RNA-Seq Analysis API",
+    description="""
+     Single-Cell RNA-Seq Analysis API
+    
+    A comprehensive, production-ready API for single-cell RNA sequencing data analysis. This platform provides state-of-the-art computational methods for processing, analyzing, 
+    and visualizing scRNA-seq data from raw counts to biological insights.
+        
+     🔄 Analysis Workflow - Follow These Steps in Order
+    
+    The API endpoints are organized into logical workflow steps. Follow the numbered steps sequentially for best results:
+    
+     🔗 Multi-Dataset Integration (Optional - Start Here for Multiple Datasets)
+    - Step 0: `/data_integration/` - Batch correction and integration of 2-3 datasets
+    
+     📤 Step 1: Data Upload (Start Here for Single Dataset)
+    - Upload Data: `/upload/` - Upload files and generate initial QC plots
+    - Try Examples: Use `analysisName="example_human"` for demo data
+    
+     🧹 Step 2: Quality Control 
+    - Apply Filters: `/process/{uuid}/` - Remove low-quality cells and genes
+    - Doublet Detection: Optional multiplet removal
+    
+     📊 Step 3: Dimensionality Reduction
+    - PCA Analysis: `/pca` - Identify highly variable genes and compute principal components
+    - Choose Method: Seurat, Cell Ranger, or Pearson residuals
+    
+     🎯 Step 4: Clustering & Embedding
+    - UMAP & Clustering: `/embedding/` - Create 2D visualization and identify cell clusters
+    - Parameter Tuning: Adjust resolution and neighbors for optimal clustering
+    
+     🎨 Step 5: Visualization
+    - Gene Expression: `/genes_visualization/` - Overlay gene expression on UMAP
+    - Clustree: `/clustree` - Visualize clustering stability across resolutions
+    - Metadata Plots: `/var_visualization/` - Color by cell metadata
+    
+     🔬 Step 6: Differential Expression
+    - Marker Genes: `/DEA/` - Find genes that distinguish cell types
+    - Statistical Methods: Wilcoxon, t-test, logistic regression
+    
+     📥 Export & Download
+    - Scanpy Format: `/scanpy_export` - Download .h5ad for Python
+    - Seurat Format: `/seurat_export` - Download .rds for R
+    - All Files: `/export-files/{uuid}` - ZIP archive with all plots and results
+    - DEA Results: `/download_dea_results/{uuid}` - CSV files with marker genes
+    
+     ℹ️ Dataset Information (Use Anytime)
+    - Analysis Status: `/info/{uuid}/` - Check progress and parameters used
+    - Available Genes: `/gene_names` - List all genes in your dataset
+    - CSV Files: `/list_csv_files/{uuid}` - See available result files
+    
+     📁 File Access (Automatic - Used by Frontend)
+    - Direct access to generated plots and CSV files
+    
+     🚀 Key Features
+    
+     Data Input & Formats
+    - Multiple Formats: `.h5ad` (Scanpy), `.rds` (Seurat), `.h5` (10x HDF5)
+    - 10x Genomics: Native support for matrix/features/barcodes format
+    - Example Datasets: Built-in PBMC, mouse brain, and zebrafish data
+    - Batch Integration: 2-3 dataset integration with multiple algorithms
+    
+     Quality Control & Processing
+    - Cell Filtering: Remove empty droplets and dying cells
+    - Gene Filtering: Eliminate lowly expressed and uninformative genes
+    - Doublet Detection: Computational identification of multiplets
+    - Species Support: Human, mouse, and zebrafish with species-specific processing
+    
+     Dimensionality Reduction & Clustering
+    - Highly Variable Genes: Multiple selection methods (Seurat, Cell Ranger)
+    - PCA: Principal component analysis with variance explanation
+    - UMAP: Non-linear embedding for visualization
+    - Leiden Clustering: Community detection for cell type identification
+    
+     Analysis & Interpretation
+    - Marker Genes: Statistical identification of cluster-specific genes
+    - Gene Visualization: Expression overlay on dimensional embeddings
+    - Multiple Test Methods: Wilcoxon, t-test, logistic regression
+    - Interactive Plots: HTML plots with hover information and zoom
+    
+     Export & Integration
+    - Scanpy Export: `.h5ad` format for Python analysis
+    - Seurat Export: `.rds` format for R analysis  
+    - CSV Results: Detailed statistics and marker gene lists
+    - Plot Archives: ZIP downloads of all visualizations
+    
+     📊 Supported Analysis Types
+    
+    - Standard scRNA-seq: Drop-seq, 10x Genomics, Smart-seq protocols
+    - Spatial Transcriptomics: 10x Visium, Slide-seq data
+    - Multi-omics: CITE-seq, ASAP-seq integration
+    - Batch Integration: Time series, treatment comparisons, multi-site studies
+    
+     🔧 Technical Specifications
+    
+    - Scalability: Handles datasets up to 100,000+ cells
+    - Processing: SLURM-based cluster computing for large datasets
+    - Storage: Persistent analysis results with unique UUID tracking
+    - Notifications: Email alerts for analysis completion
+    - Format Support: Cross-platform compatibility (Python ↔ R)
+    
+     📖 Getting Started
+    
+    1. Try Examples: Use `analysisName="example_human"` in `/upload/` endpoint
+    2. Check Status: Use `/info/{uuid}/` to track analysis progress
+    3. View Results: Access plots via returned file paths
+    4. Export Data: Download results in your preferred format
+    
+     ⚡ Quick Tips
+    
+    - Parameter Defaults: Optimized for typical datasets, adjust based on data characteristics
+    - Gene Names: Use `/gene_names` to check available genes before visualization
+    - Processing Time: Varies from 5 minutes (small) to 2+ hours (large, complex analyses)
+    - Quality Guidelines: Retain >80% cells, expect 50-70% gene retention after filtering
+    
+    For detailed parameter descriptions, examples, and troubleshooting, see individual endpoint documentation below.
+    """,
+    version="1.0.0",
+    terms_of_service="",
+    contact={
+        "name": "Sergio Hernández",
+        "url": "https://apps.cienciavida.org/scexplorer/",
+        "email": "felipehg1991@gmail.com",
+    },
+    license_info={
+        "name": "Apache 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
+    },
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+)
+
+UPLOAD_FOLDER = "uploads"
+DATABASE = "tasks.db"
+
+def update_config(uuid: str, new_params: dict):
+    """
+    Lee el config.txt en uploads/{uuid}/config.txt si existe,
+    mezcla los parámetros con new_params y vuelve a escribirlo.
+    """
+    cfg_path = os.path.join(UPLOAD_FOLDER, uuid, "config.txt")
+    config = {}
+    # 1) si ya existe, léelo
+    if os.path.exists(cfg_path):
+        with open(cfg_path, "r") as f:
+            for line in f:
+                if "=" in line:
+                    k, v = line.strip().split("=", 1)
+                    config[k] = v
+    # 2) sobrescribe/añade
+    for k, v in new_params.items():
+        config[k] = str(v)
+    # 3) escribe de nuevo
+    with open(cfg_path, "w") as f:
+        for k, v in config.items():
+            f.write(f"{k}={v}\n")
+
+def get_db():
+    conn = sqlite3.connect(DATABASE)
+    return conn
+
+@app.on_event("startup")
+def startup():
+    if not os.path.exists(UPLOAD_FOLDER):
+        os.makedirs(UPLOAD_FOLDER)
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Create tasks table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY,
+        uuid TEXT NOT NULL UNIQUE,
+        file_path TEXT,
+        species TEXT,
+        email TEXT,
+        analysisName TEXT,  
+        created_at TEXT NOT NULL
+    );
+    """)
+
+    # Create processing_info table with the new columns
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS processing_info (
+        id INTEGER PRIMARY KEY,
+        task_id INTEGER,
+        cells_number_pre_processing INTEGER,
+        genes_number_pre_processing INTEGER,
+        cells_number_post_processing INTEGER,
+        genes_number_post_processing INTEGER,
+        min_genes INTEGER,
+        min_cells INTEGER,
+        mito_threshold REAL, 
+        n_neighbors INTEGER DEFAULT NULL,
+        n_pcs INTEGER DEFAULT NULL,
+        clusters INTEGER DEFAULT NULL,
+        FOREIGN KEY(task_id) REFERENCES tasks(id)
+    );
+    """)
+        
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS dea_results (
+        id INTEGER PRIMARY KEY,
+        task_id INTEGER,
+        dotplot_1_path TEXT,
+        dotplot_2_path TEXT,
+        FOREIGN KEY(task_id) REFERENCES tasks(id)
+    );
+    """)
+    conn.commit()
+    conn.close()
+    
+# app = FastAPI()
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+app.add_middleware(PrefixStripMiddleware, prefix="/backend")
+
+#def normalize_files(dataset_3: Union[List[UploadFile], UploadFile, None] = File(None)) -> List[UploadFile]:
+#    if isinstance(dataset_3, list):
+#        return dataset_3
+#    elif isinstance(dataset_3, UploadFile):
+#        return [dataset_3]
+#    return [dataset_3]
+
+#def normalize_files(files: Union[List[UploadFile], UploadFile, None] = File(None)) -> List[UploadFile]:
+#    if isinstance(files, list):
+#        return files
+#    elif isinstance(files, UploadFile):
+#        return [files]
+#    return [files]
+
+@app.get("/")
+def read_root():
+    return {"Backend": "Running"}
+
+
+@app.get("/download_dea_results/{uuid}", tags=["📥 Export & Download"])
+async def download_dea_results_zip(uuid: str):
+    """
+    Creates a ZIP archive of all DEA result CSVs and returns it for download.
+
+    Parameters:
+    - uuid: str - UUID for the specific analysis
+
+    Returns:
+    - A FileResponse containing the requested ZIP file.
+    """
+
+    # Path to the directory containing the DEA result CSV files
+    results_dir = os.path.join(UPLOAD_FOLDER, uuid, "dea", "results")
+
+    # Check if the directory exists and is a directory
+    if not os.path.isdir(results_dir):
+        raise HTTPException(status_code=404, detail="DEA results directory not found.")
+
+    # List of CSV files to be zipped
+    csv_files = [f for f in os.listdir(results_dir) if f.endswith('.csv')]
+    if not csv_files:
+        raise HTTPException(status_code=404, detail="No CSV files found in DEA results directory.")
+
+    # Define a temporary path for the ZIP file in a writable directory
+    zip_path = f"/tmp/{uuid}_dea_results.zip"
+
+    try:
+        # Create a new ZIP file
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for filename in csv_files:
+                file_path = os.path.join(results_dir, filename)
+                # arcname=filename ensures the files are at the root of the zip archive
+                zipf.write(file_path, arcname=filename)
+
+        # Return the ZIP file as a response that the browser will download.
+        return FileResponse(
+            path=zip_path,
+            media_type="application/zip",
+            filename=f"{uuid}_dea_results.zip"
+        )
+    except Exception as e:
+        # Handle potential exceptions during file creation
+        raise HTTPException(status_code=500, detail=f"Failed to create zip file: {str(e)}")
+
+
+
+# ── data integration endpoint (replaces the old version) ────────────────
+@app.post("/data_integration/", tags=["🔗 Multi-Dataset Integration"], summary="Step 0: Integrate Multiple Datasets")
+async def data_integration(
+    dataset_1: List[UploadFile] = File(...),
+    dataset_2: List[UploadFile] = File(...),
+    dataset_3: List[UploadFile] = File(default=[]),
+    analysisName: str = Form(...),
+    email: Optional[str] = Form(None),
+    preprocess: bool = Query(True),
+    batch_correction_method: str = Form(...)
+):
+    """
+    Integrate multiple single-cell RNA-seq datasets to remove batch effects.
+    
+    This specialized endpoint handles the integration of 2-3 separate scRNA-seq datasets,
+    applying computational methods to remove technical batch effects while preserving
+    biological variation. Essential for comparing datasets from different experiments,
+    time points, or conditions.
+    
+    Integration Strategy:
+    - Batch Detection: Identify technical differences between datasets
+    - Feature Alignment: Match genes across datasets with different annotations
+    - Correction Methods: Apply state-of-the-art batch correction algorithms
+    - Quality Assessment: Generate before/after integration plots
+    
+    Parameters:
+    - dataset_1: List[UploadFile] - First dataset (required)
+      - Same file formats as `/upload/` endpoint
+      - Can be single file (.h5ad, .rds, .h5) or multiple files (10x format)
+    - dataset_2: List[UploadFile] - Second dataset (required)
+      - Should be from different batch/experiment than dataset_1
+      - Compatible file formats with dataset_1
+    - dataset_3: List[UploadFile] - Third dataset (optional)
+      - Additional dataset for three-way integration
+      - Leave empty for two-dataset integration
+    - analysisName: str - Name for the integration analysis
+      - Example: "Treatment_vs_Control_vs_Timecourse"
+    - email: Optional[str] - Email for completion notification
+    - preprocess: bool - Apply preprocessing before integration (default: true)
+      - Recommended: true for raw data, false for pre-processed data
+    - batch_correction_method: str - Integration algorithm to use
+      - `"harmony"`: Fast, effective for most cases (recommended)
+      - `"scanorama"`: Good for different cell types across batches
+      - `"combat"`: Classical method, works well for similar datasets
+      - `"bbknn"`: Batch-balanced k-NN, preserves rare cell types
+    
+    Returns:
+    ```json
+    {
+        "message": "Integration submitted",
+        "uuid": "550e8400-e29b-41d4-a716-446655440000",
+        "analysisName": "Drug_Treatment_Integration", 
+        "plots_path": [
+            "uploads/550e8400-e29b-41d4-a716-446655440000/integration/umap_before_integration.html",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/integration/umap_after_integration.html"
+        ]
+    }
+    ```
+    
+    HTTP Status Codes:
+    - `200`: Successful integration completion
+    - `400`: Incompatible datasets, missing required parameters
+    - `413`: Combined datasets too large
+    - `422`: Invalid batch correction method
+    - `500`: Integration algorithm failure, memory issues
+    
+    Processing Time: 20-120 minutes depending on dataset sizes and method
+    """
+    print(">>> received data_integration", flush=True)
+    try:
+        unique_id  = str(uuid.uuid4())
+        dir_path   = os.path.join(UPLOAD_FOLDER, unique_id)
+        plots_path = os.path.join(dir_path, "integration")
+        os.makedirs(plots_path, exist_ok=True)
+
+        # Build unified list of datasets actually supplied
+        datasets = [dataset_1, dataset_2]
+        if dataset_3:                                  # append only if user supplied files
+            datasets.append(dataset_3)
+
+        keys, adata_list = [], []
+        for idx, fileset in enumerate(datasets):
+            batch_key = f"batch{idx+1}"
+            keys.append(batch_key)
+
+            for file in fileset:
+                save_path = os.path.join(dir_path, file.filename)
+                with open(save_path, "wb") as fh:
+                    shutil.copyfileobj(file.file, fh)
+
+                # --- load each file into an AnnData object -----------------------
+                if save_path.endswith(".h5ad"):
+                    adata = sc.read_h5ad(save_path)
+
+                elif save_path.endswith(".rds"):
+                    r_script = f"""
+                    library(Seurat); library(zellkonverter)
+                    obj  <- readRDS("{save_path}")
+                    obj  <- UpdateSeuratObject(obj)
+                    sce  <- as.SingleCellExperiment(obj)
+                    writeH5AD(sce, "{save_path[:-4]}.h5ad")
+                    """
+                    script_path = os.path.join(dir_path, f"to_h5ad_{idx}.R")
+                    with open(script_path, "w") as fh: fh.write(r_script)
+                    run_r_script(script_path, [])
+                    adata = sc.read_h5ad(f"{save_path[:-4]}.h5ad")
+
+                else:  # assume 10x folder / .h5
+                    adata = sc.read_10x_mtx(
+                        save_path, var_names="gene_symbols", cache=False
+                    )
+
+                adata_list.append(adata)
+
+        # Concatenate & save master object
+        adata_concat = sc.concat(adata_list, label="batch", keys=keys)
+        concat_path  = os.path.join(dir_path, f"{unique_id}.h5ad")
+        adata_concat.write_h5ad(concat_path)
+
+        # ── Submit integration plot job via Slurm ─────────────────────────
+        slurm_out = os.path.join(plots_path, "integration_plots.out")
+        slurm_err = os.path.join(plots_path, "integration_plots.err")
+        cmd = [
+            "sbatch",
+            "--job-name=integration_plots",
+            f"--output={slurm_out}",
+            f"--error={slurm_err}",
+            "slurm_scripts/slurm_integration.sh",
+            concat_path,
+            plots_path,
+            batch_correction_method,
+            unique_id,
+            str(preprocess)
+        ]
+        slurm_job_id = subprocess.run(cmd, capture_output=True, text=True).stdout.strip().split()[-1]
+
+        # Wait until job finishes
+        status = await wait_for_job_completion(slurm_job_id)
+        if status != "COMPLETED":
+            raise HTTPException(status_code=500, detail=f"Integration job failed ({status})")
+
+        # Read list of generated plot paths from Slurm stdout
+        if not os.path.exists(slurm_out):
+            raise HTTPException(status_code=404, detail="Output file not found.")
+
+        with open(slurm_out, "r") as fh:
+            output = fh.read()
+
+        match = re.search(r"\['[^]]*'\]", output)
+        plot_paths = eval(match.group(0)) if match else []
+
+        # Send notification e-mail, if requested
+        if email:
+            try:
+                upload_notification(email, analysisName, unique_id)
+            except Exception as e:
+                print(f"Email notification failed: {e}")
+
+        return {
+            "message": "Integration submitted",
+            "uuid": unique_id,
+            "analysisName": analysisName,
+            "plots_path": plot_paths
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.exception_handler(Exception)
+async def exception_handler(request, exc):
+    return JSONResponse(
+        status_code=500,
+        content={"message": "An unexpected error occurred", "details": str(exc)},
+    )
+
+def run_r_script(script_path, script_args):
+    cmd = ["Rscript", script_path] + script_args
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr)
+    return result.stdout
+
+
+@app.post("/pdf_report/", tags=["📥 Export & Download"])
+async def upload_pdf(file: UploadFile = File(...), uuid: str = Form(...)):
+    try:
+        upload_dir = os.path.join(UPLOAD_FOLDER, uuid)
+
+        os.makedirs(upload_dir, exist_ok=True)
+
+        file_path = f"{upload_dir}/analysis_report.pdf"
+
+        with open(file_path, "wb") as f:
+            f.write(await file.read())
+
+        return JSONResponse(
+            status_code=200, content={"message": "PDF successfully uploaded.", "path": str(file_path)}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500, content={"message": f"An error occurred: {str(e)}"}
+        )
+
+
+@app.post("/upload/", tags=["📤 Step 1: Data Upload"], summary="Step 1: Upload Data Files")
+async def upload_file(
+    species: str = Form(...),
+    analysisName: str = Form(...),
+    email: Optional[str] = Form(None),
+    flavor: str = Form(...),
+    files: List[UploadFile] = File(None)
+):
+    """
+    Upload and process single-cell RNA sequencing data files for analysis.
+    
+    This endpoint is the first step in the scRNA-seq analysis workflow. It accepts various file formats,
+    performs initial quality control, and generates basic dataset statistics and QC plots.
+    
+    Supported File Formats:
+    - `.h5ad` (AnnData/Scanpy format)
+    - `.rds` (Seurat R objects)
+    - `.h5` (10x Genomics HDF5 format)
+    - Multiple files for 10x format: `matrix.mtx.gz`, `features.tsv.gz` (or `genes.tsv.gz`), `barcodes.tsv.gz`
+    
+    Pre-built Example Datasets:
+    Use `analysisName` with these values to load example data:
+    - `example_human`: Human PBMC dataset (3k cells)
+    - `example_mouse`: Mouse brain dataset
+    - `example_zebrafish`: Zebrafish development dataset
+    
+    Parameters:
+    - files: List[UploadFile] - Single-cell RNA-seq data files. Can be:
+      - Single file: `.h5ad`, `.rds`, or `.h5` format
+      - Multiple files: For 10x format (matrix + features + barcodes)
+      - Leave empty when using example datasets
+    - species: str - Species of the biological sample. Valid options:
+      - `"human"` (Homo sapiens)
+      - `"mouse"` (Mus musculus) 
+      - `"zebrafish"` (Danio rerio)
+      - Used for mitochondrial gene detection and species-specific analysis
+    - analysisName: str - Human-readable name for the analysis (max 100 chars)
+      - Examples: "PBMC_treatment_vs_control", "Brain_development_timecourse"
+      - Use `example_human`, `example_mouse`, or `example_zebrafish` for demo data
+    - email: Optional[str] - Email address for completion notifications
+      - Must be valid email format (example@domain.com)
+      - Notifications sent when processing completes
+    - flavor: str - Analysis flavor/pipeline variant:
+      - `"standard"`: Standard scRNA-seq processing
+      - `"spatial"`: Spatial transcriptomics optimized
+      - `"multiome"`: Multi-omics data processing
+    
+    Returns:
+    ```json
+    {
+        "message": "File uploaded successfully",
+        "uuid": "550e8400-e29b-41d4-a716-446655440000",
+        "analysisName": "PBMC_treatment_vs_control",
+        "plots_path": [
+            "uploads/550e8400-e29b-41d4-a716-446655440000/qc_plots/violin_plot_qc_metrics.html",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/qc_plots/scatter_plot_genes_vs_counts.html"
+        ],
+        "dataset_description": {
+            "n_cells": 2700,
+            "n_genes": 32738,
+            "mitochondrial_genes": 13,
+            "mean_genes_per_cell": 1838.2,
+            "mean_counts_per_cell": 4926.8
+        }
+    }
+    ```
+    
+    HTTP Status Codes:
+    - `200`: Successful upload and processing
+    - `400`: Invalid file format, missing required files, or invalid parameters
+    - `413`: File too large (max 2GB per file)
+    - `422`: Validation error (invalid species, email format, etc.)
+    - `500`: Processing error (corrupted files, insufficient resources)
+    
+    
+    Next Steps: Use the returned `uuid` with the `/process/{uuid}/` endpoint for quality control filtering.
+    """
+    try:
+        example_files = {
+            "example_human": "examples/pbmc35.h5ad",
+            "example_mouse": "examples/mouse_brain.h5ad",
+            "example_zebrafish": "examples/zebrafish.h5ad",
+        }
+
+        if analysisName.startswith("example_"):
+            unique_id = str(uuid.uuid4())
+            dir_path = os.path.join(UPLOAD_FOLDER, unique_id)
+            example_path = analysisName
+            file_path = example_files.get(example_path)
+            if not file_path:
+                raise HTTPException(status_code=400, detail="Example not found")
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
+            qc_plots_path = os.path.join(dir_path, "qc_plots")
+            if not os.path.exists(qc_plots_path):
+                os.makedirs(qc_plots_path)
+            new_filename = f"{unique_id}.h5ad"
+            new_file_path = os.path.join(dir_path, new_filename)
+            shutil.copy(file_path, new_file_path)
+        else:
+            # If not an example, handle new file uploads
+            unique_id = str(uuid.uuid4())
+            dir_path = os.path.join(UPLOAD_FOLDER, unique_id)
+            
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
+            qc_plots_path = os.path.join(dir_path, "qc_plots")
+            if not os.path.exists(qc_plots_path):
+                os.makedirs(qc_plots_path)
+            
+            file_paths = []
+            features_path = None
+
+            if len(files) == 1:
+                file = files[0]
+                file_extension = os.path.splitext(file.filename)[-1]
+                save_path = os.path.join(dir_path, f"{unique_id}{file_extension}")
+                with open(save_path, "wb+") as f:
+                    f.write(file.file.read())
+                file_paths.append(save_path)
+            else:
+                for file in files:
+                    print(f"filename:{file.filename}")
+                    save_path = os.path.join(dir_path, file.filename)
+                    with open(save_path, "wb+") as f:
+                        f.write(file.file.read())
+                    file_paths.append(save_path)
+                    if 'features.tsv.gz' in file.filename:
+                        print(f"features detected:{file.filename}")
+                        features_path = save_path
+
+            if any(file.endswith('.h5ad') for file in file_paths):
+                file_path = next(file for file in file_paths if file.endswith('.h5ad'))
+            elif any(file.endswith('.h5') for file in file_paths):
+                print("inside h5")
+                print(f"file: {file_paths}")
+                try:
+                    adata = sc.read_10x_h5(file_paths[0])
+                    file_path = os.path.join(dir_path, f"{unique_id}.h5ad")
+                    adata.write_h5ad(file_path)
+                except Exception as e:
+                    print(f"error: {e}")
+            elif any(file.endswith('.rds') for file in file_paths):
+                file_path = next(file for file in file_paths if file.endswith('.rds'))
+
+                r_script = f"""
+                library(Seurat)
+                library(zellkonverter)
+
+                # Specify the paths
+                seurat_object_path <- "{os.path.join(dir_path, unique_id)}.rds"
+                output_path <- "{os.path.join(dir_path, unique_id)}.h5ad"
+
+                # Load the Seurat object
+                seurat_object <- readRDS(seurat_object_path)
+                seurat_object <- UpdateSeuratObject(seurat_object)
+
+                sce_object <- as.SingleCellExperiment(seurat_object)
+                writeH5AD(sce_object, output_path)
+
+                message("Seurat object has been successfully converted to H5AD format.")
+                """
+                r_script_path = os.path.join(dir_path, "convert_to_h5ad.R")
+                with open(r_script_path, "w") as f:
+                    f.write(r_script)
+                run_r_script(r_script_path, [])
+                file_path = os.path.join(dir_path, f"{unique_id}.h5ad")
+            else:
+                print("inside_10x")
+                print(f"dir_path:{dir_path}")
+
+                try:
+                    if features_path:
+                        print(f"inside {features_path}")
+                        with gzip.open(features_path, 'rt') as f:
+                            features_df = pd.read_csv(f, sep='\t', header=None)
+            
+                        # Check if features_df has exactly one column
+                        if features_df.shape[1] == 1:
+                            features_df[1] = features_df[0]  # Copy the first column into the second
+                            features_df[2] = "Gene Expression"  # Create a third column named "Gene Expression"
+                        elif features_df.shape[1] == 2:
+                            features_df[2] = "Gene Expression"  # Add a third column named "Gene Expression"
+                        
+                        # Write the updated DataFrame back to a new file and recompress it
+                        new_features_path = features_path.replace('.gz', '')
+                        features_df.to_csv(new_features_path, sep='\t', header=False, index=False)
+                        with open(new_features_path, 'rb') as f_in:
+                            with gzip.open(features_path, 'wb') as f_out:
+                                shutil.copyfileobj(f_in, f_out)
+                        os.remove(new_features_path)
+
+                        
+                        if os.path.exists(qc_plots_path) and os.path.isdir(qc_plots_path):
+                            shutil.rmtree(qc_plots_path)
+                    
+                    print(f"files:{os.listdir(dir_path)}")
+                    
+                    adata = sc.read_10x_mtx(
+                    dir_path,  # directory with matrix.mtx, genes.tsv (or features.tsv), and barcodes.tsv
+                    var_names='gene_symbols',  # use gene symbols for variable names (otherwise use gene IDs)
+                    )
+                    if not os.path.exists(qc_plots_path):
+                        os.makedirs(qc_plots_path)
+                    print(f"adata: {adata}")
+                    adata.write_h5ad(os.path.join(dir_path, f"{unique_id}.h5ad"))
+                    print("post_h5ad_10x writing")
+                    file_path = os.path.join(dir_path, f"{unique_id}.h5ad")
+                except Exception as e:
+                    print(f"error:{e}")
+        print("pre_slurm")
+        root_path = UPLOAD_FOLDER
+        cmd = [
+            "sbatch",
+            "--job-name=qc_plots",
+            f"--output={os.path.join(UPLOAD_FOLDER, unique_id, 'qc_plots/qc_plots.out')}",
+            f"--error={os.path.join(UPLOAD_FOLDER, unique_id, 'qc_plots/qc_plots.err')}",
+            "slurm_scripts/qc_plots.sh",
+            file_path,
+            qc_plots_path,
+            species,
+            flavor,
+            root_path,
+            unique_id
+        ]
+        slurm_job_id = subprocess.run(cmd, capture_output=True, text=True).stdout.strip().split()[-1]
+
+        job_status = await wait_for_job_completion(slurm_job_id)
+        if job_status == "COMPLETED":
+            if email:
+                try:
+                    print(f"INSIDE_EMAIL:{email}")
+                    upload_notification(email, analysisName, unique_id)
+                except Exception as e:
+                    print(f"Error en la notificación de carga: {e}")
+            output_file_path = os.path.join(UPLOAD_FOLDER, unique_id, "qc_plots/qc_plots.out")
+           
+            print("post_slurm")
+
+            if os.path.exists(output_file_path):
+                with open(output_file_path, 'r') as f:
+                    output_contents = f.read()
+                plot_paths, dataset_description = parse_output_content(output_contents)
+            else:
+                raise HTTPException(status_code=404, detail="Output file not found.")
+
+            return {
+                "message": "File uploaded successfully",
+                # "file_paths": file_paths,
+                "uuid": unique_id,
+                "analysisName": analysisName,
+                "plots_path": plot_paths,
+                "dataset_description": dataset_description
+            }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/process/{file_uuid}/", tags=["🧹 Step 2: Quality Control"], summary="Step 2: Apply Quality Control Filters")
+async def process_file(file_uuid: str, params: ProcessDataParams = Depends()):
+    """
+    Apply quality control filters to remove low-quality cells and genes.
+    
+    This is the second step in the scRNA-seq analysis workflow. After uploading data, use this endpoint
+    to filter out poor-quality cells and uninformative genes based on standard QC metrics.
+    
+    Quality Control Strategy:
+    - Cell filtering: Remove cells with too few genes (likely empty droplets or dead cells)
+    - Gene filtering: Remove genes expressed in too few cells (noise or batch effects)
+    - Mitochondrial filtering: Remove cells with high mitochondrial gene expression (dying/stressed cells)
+    - Doublet detection: Optional detection and removal of cell doublets/multiplets
+    
+    Parameters:
+    - file_uuid: str - UUID from the `/upload/` endpoint response
+      - Format: "550e8400-e29b-41d4-a716-446655440000"
+      - Must correspond to a successfully uploaded dataset
+    
+    Query Parameters (ProcessDataParams):
+    - min_genes: int - Minimum genes per cell threshold (default: 200)
+      - Range: 100-2000, typical values: 200-500
+      - Lower values: Keep more cells but include more noise
+      - Higher values: Stricter filtering, may remove cell types with low complexity
+    - min_cells: int - Minimum cells per gene threshold (default: 3)
+      - Range: 1-50, typical values: 3-10  
+      - Higher values remove rare genes but may eliminate cell-type-specific markers
+    - mito_threshold: float - Maximum mitochondrial gene percentage (default: 20.0)
+      - Range: 5.0-50.0, typical values: 10.0-25.0
+      - Species-dependent: human ~20%, mouse ~10%
+      - Lower values: Stricter quality control
+    - doublet_detection: bool - Enable doublet detection (default: false)
+      - Uses computational methods to identify potential doublets
+      - Recommended for droplet-based protocols (10x, Drop-seq)
+    
+    Example Request:
+    ```
+    GET /process/550e8400-e29b-41d4-a716-446655440000/?min_genes=300&min_cells=5&mito_threshold=15.0&doublet_detection=true
+    ```
+    
+    Returns:
+    ```json
+    {
+        "cells_pre_processing": 2700,
+        "genes_pre_processing": 32738,
+        "cells_post_processing": 2456,
+        "genes_post_processing": 18245,
+        "cells_filtered_min_genes": 127,
+        "genes_filtered_min_cells": 12891,
+        "cells_filtered_mito": 117,
+        "doublets_detected": 89,
+        "doublets_removed": 89,
+        "processing_plots": [
+            "uploads/550e8400-e29b-41d4-a716-446655440000/preprocess/filtering_summary.html",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/preprocess/qc_violin_before_after.html"
+        ],
+        "filtering_summary": {
+            "total_cells_removed": 244,
+            "total_genes_removed": 14493,
+            "percent_cells_retained": 90.96,
+            "percent_genes_retained": 55.73
+        }
+    }
+    ```
+    
+    HTTP Status Codes:
+    - `200`: Successful processing and filtering
+    - `404`: UUID not found or file doesn't exist
+    - `422`: Invalid parameter values (out of acceptable ranges)
+    - `500`: Processing error (insufficient memory, corrupted data)
+    
+    Processing Time: 5-20 minutes depending on dataset size and doublet detection
+    
+    Quality Guidelines:
+    - Retain >80% of cells for good datasets
+    - Retain 50-70% of genes (many genes are lowly expressed)
+    - Adjust thresholds based on your biological question and dataset characteristics
+    
+    Next Steps: Use `/pca` endpoint for dimensionality reduction and highly variable gene selection.
+    """
+    dir_path = os.path.join(UPLOAD_FOLDER, file_uuid)
+    file_path = os.path.join(dir_path, f"{file_uuid}.h5ad")
+    matching_files = glob.glob(file_path)
+    
+    if not matching_files:
+        return {"error": "Archivo no encontrado."}
+    
+    preprocess_plots_path = os.path.join(dir_path, "preprocess")
+        
+    if not os.path.exists(preprocess_plots_path):
+        os.makedirs(preprocess_plots_path)
+        
+    actual_file_path = matching_files[0]
+    
+    partition = "debug" 
+    root_path = UPLOAD_FOLDER
+    cmd = [
+        "sbatch",
+        "--job-name=preprocess",
+        f"--output={os.path.join(UPLOAD_FOLDER, file_uuid, 'preprocess/preprocess.out')}",
+        f"--error={os.path.join(UPLOAD_FOLDER, file_uuid, 'preprocess/preprocess.err')}",
+        f"--partition={partition}",  
+        "slurm_scripts/slurm_preprocess.sh",
+        actual_file_path,
+        preprocess_plots_path,
+        str(params.doublet_detection),
+        str(root_path),
+        str(file_uuid),
+        str(params.min_genes),
+        str(params.min_cells),
+        str(params.mito_threshold)
+ 
+    ]
+    
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    
+    if result.returncode != 0:
+        raise HTTPException(status_code=500, detail=f"Error submitting SLURM job: {result.stderr}")
+    
+    # Debugging output to check the result of the sbatch command
+    print(f"sbatch result: {result.stdout.strip()}")
+    
+    # Extracting job ID correctly
+    slurm_job_id_line = result.stdout.strip().split()[-1]
+    try:
+        slurm_job_id = int(slurm_job_id_line)
+    except ValueError:
+        raise HTTPException(status_code=500, detail=f"Failed to extract job ID from sbatch output: {slurm_job_id_line}")
+    
+    print(f"SLURM JOB ID: {slurm_job_id}")  # Print the job ID for debugging
+    
+    job_status = await wait_for_job_completion(slurm_job_id)
+    output_contents = ""
+
+    if job_status == "COMPLETED":
+        output_file_path = f"uploads/{file_uuid}/preprocess/preprocess.out"
+        output_contents = await read_output_file(output_file_path)
+    else:
+        raise HTTPException(status_code=500, detail=f"Job did not complete successfully. Status: {job_status}")
+    
+    match = re.search(r'({.*})', output_contents, re.DOTALL)
+    if match:
+        dict_part = match.group(1)
+        try:
+            processing_results = eval(dict_part)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to evaluate dictionary: {e}")
+    else:
+        raise HTTPException(status_code=500, detail="Failed to extract processing results from output.")
+    
+    update_config(
+    file_uuid,
+    {
+        "min_genes": params.min_genes,
+        "min_cells": params.min_cells,
+        "mt_threshold": params.mito_threshold,
+        "doublet_detection": str(params.doublet_detection).lower(),
+    }
+    )
+    
+    return processing_results
+
+
+async def read_output_file(output_file_path):
+    retries = 0
+    max_retries = 10
+    while retries < max_retries:
+        if os.path.exists(output_file_path):
+            with open(output_file_path, 'r') as file:
+                return file.read()
+        retries += 1
+        await asyncio.sleep(5)  # Espera 5 segundos antes de volver a verificar
+    raise HTTPException(status_code=500, detail="Output file not found after job completion.")
+
+@app.post("/pca", tags=["📊 Step 3: Dimensionality Reduction"], summary="Step 3: PCA Analysis")
+async def pca(file_uuid: str,params : PcaParams = Depends()):
+    """
+    Perform dimensionality reduction using Principal Component Analysis (PCA).
+    
+    This is the third step in the scRNA-seq analysis workflow. After quality control filtering,
+    this endpoint identifies highly variable genes and computes principal components to reduce
+    the dimensionality from thousands of genes to a manageable number of components.
+    
+    Biological Rationale:
+    - Highly Variable Genes (HVGs): Focus analysis on genes showing biological variation
+    - PCA: Linear dimensionality reduction that captures the major sources of variation
+    - Noise Reduction: Filter out technical noise while preserving biological signal
+    
+    Parameters:
+    - file_uuid: str - UUID from previous processing steps
+      - Must correspond to a dataset that has been uploaded and quality-filtered
+    
+    Request Body (PcaParams):
+    - n_genes: int - Number of highly variable genes to select (default: 2000)
+      - Range: 500-5000, typical values: 1000-3000
+      - More genes: Capture more biological variation but include more noise
+      - Fewer genes: Focus on strongest signals but may miss subtle biology
+      - Recommended: 2000 for most datasets, 3000+ for heterogeneous samples
+    - flavor: str - Method for HVG detection (default: "seurat")
+      - `"seurat"`: Seurat's variance stabilization (recommended for most cases)
+      - `"cell_ranger"`: 10x Genomics method (good for 10x data)
+    
+    Example Request:
+    ```json
+    {
+        "n_genes": 2500,
+        "flavor": "seurat"
+    }
+    ```
+    
+    Returns:
+    ```json
+    {
+        "file_uuid": "550e8400-e29b-41d4-a716-446655440000",
+        "message": "PCA Analysis done.",
+        "pca_plot_paths": [
+            "uploads/550e8400-e29b-41d4-a716-446655440000/embedding/hvg_plot.html",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/embedding/pca_variance_ratio.html",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/embedding/pca_components.html",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/embedding/elbow_plot.html"
+        ],
+        "pca_summary": {
+            "n_highly_variable_genes": 2500,
+            "hvg_method": "seurat",
+            "total_variance_explained": 0.847,
+            "n_components_90_var": 18,
+            "recommended_n_pcs": 20
+        }
+    }
+    ```
+    
+    Generated Plots:
+    1. HVG Plot: Shows highly variable genes with mean vs. variance relationship
+    2. PCA Variance Ratio: Explains how much variance each PC captures
+    3. PCA Components: Visualizes the first few principal components
+    4. Elbow Plot: Helps determine optimal number of PCs for downstream analysis
+    
+    HTTP Status Codes:
+    - `200`: Successful PCA computation
+    - `404`: UUID not found or file not processed
+    - `422`: Invalid parameters (n_genes out of range, unknown flavor)
+    - `500`: Computation error (insufficient memory, numerical issues)
+    
+    Processing Time: 3-15 minutes depending on dataset size and parameters
+    
+    Interpretation Guidelines:
+    - Elbow Plot: Look for the "elbow" point where variance plateaus (typically 15-25 PCs)
+    - Variance Explained: First PC should capture 5-15% of variance
+    - HVG Selection: Balance between capturing biology and avoiding noise
+    
+    Next Steps: Use `/embedding/` endpoint for UMAP visualization and clustering.
+    """
+    dir_path = os.path.join(UPLOAD_FOLDER, file_uuid)
+    file_path = os.path.join(dir_path, f"{file_uuid}.h5ad")
+    matching_files = glob.glob(file_path)
+    
+    if not matching_files:
+        return {"error": "Archivo no encontrado."}
+    
+    embedding_plots_directory = os.path.join(dir_path,"embedding")
+    if not os.path.exists(embedding_plots_directory):
+        os.makedirs(embedding_plots_directory)
+        
+    actual_file_path = matching_files[0]
+    
+    if not os.path.exists(actual_file_path):
+        raise HTTPException(status_code=404, detail="File not found in the upload folder")
+    
+    partition = "debug" 
+    root_path = UPLOAD_FOLDER
+    cmd = [
+        "sbatch",
+        "--job-name=embedding",
+        f"--output={os.path.join(UPLOAD_FOLDER, file_uuid, f'embedding/embedding.out')}",
+        f"--error={os.path.join(UPLOAD_FOLDER, file_uuid, f'embedding/embedding.err')}",
+        f"--partition={partition}",
+        "slurm_scripts/slurm_embedding_pca.sh",
+        actual_file_path,
+        embedding_plots_directory,
+        str(params.n_genes),
+        params.flavor,
+        root_path,
+        file_uuid
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    print(f"sbatch result: {result.stdout.strip()}")
+    
+    # Extracting job ID correctly
+    slurm_job_id = result.stdout.strip().split()[-1]
+    print(f"SLURM JOB ID: {slurm_job_id}")
+        
+    job_status = await wait_for_job_completion(slurm_job_id)
+    output_contents = ""
+
+    if job_status == "COMPLETED":
+
+        output_file_path = f"uploads/{file_uuid}/embedding/embedding.out"
+        output_contents = await read_output_file(output_file_path)
+
+    else:
+        raise HTTPException(status_code=404, detail="Output file not found.")   
+    
+    try:
+        file_paths_list = eval(output_contents)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to return pca file paths: {e}")
+    update_config(
+       file_uuid,
+    {
+        "n_high_variable_genes": params.n_genes,
+        "hvg_method": params.flavor
+    }
+    )
+    
+    return {
+    "file_uuid": file_uuid, 
+    "pca_plot_paths": file_paths_list,
+    "message": "PCA Analysis done."
+    }
+    
+@app.post("/embedding/", tags=["🎯 Step 4: Clustering & Embedding"], summary="Step 4: UMAP Embedding & Leiden Clustering")
+async def embedding(file_uuid: str,params: EmbeddingParams = Depends()): 
+    """
+    Generate UMAP embedding and perform Leiden clustering for cell type discovery.
+    
+    This is the fourth step in the scRNA-seq analysis workflow. After PCA, this endpoint
+    creates a 2D UMAP visualization and identifies cell clusters using the Leiden algorithm.
+    
+    Biological Goals:
+    - UMAP Embedding: Non-linear dimensionality reduction for visualization
+    - Neighborhood Graph: Build k-nearest neighbor graph in PC space
+    - Leiden Clustering: Community detection to identify cell populations
+    - Cluster Visualization: Generate plots colored by clusters and metadata
+    
+    Parameters:
+    - file_uuid: str - UUID from previous PCA analysis
+      - Must have completed PCA analysis with computed principal components
+    
+    Request Body (EmbeddingParams):
+    - n_neighbors: int - Number of neighbors for UMAP algorithm (default: 15)
+      - Range: 5-100, typical values: 10-30
+      - Lower values: More local structure, finer clusters, may create artifacts
+      - Higher values: More global structure, broader clusters, smoother embedding
+      - Recommended: 15 (default), increase for large datasets (>10k cells)
+    - n_pcs: int - Number of principal components to use (default: 18)
+      - Range: 10-50, typical values: 15-25
+      - Should be guided by the elbow plot from PCA analysis
+      - More PCs: Capture more variation but may include noise
+      - Fewer PCs: Focus on major variation but may miss subtypes
+    - resolution: float - Leiden clustering resolution (default: 0.5)
+      - Range: 0.1-2.0, typical values: 0.3-1.0
+      - Lower values: Fewer, larger clusters
+      - Higher values: More, smaller clusters
+      - Adjust based on expected number of cell types
+    
+    Example Request:
+    ```json
+    {
+        "n_neighbors": 20,
+        "n_pcs": 20,
+        "resolution": 0.6
+    }
+    ```
+    
+    Returns:
+    ```json
+    {
+        "file_uuid": "550e8400-e29b-41d4-a716-446655440000",
+        "message": "Embedding and clustering done.",
+        "embedding_plot_paths": [
+            "uploads/550e8400-e29b-41d4-a716-446655440000/embedding/umap_clusters.html",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/embedding/umap_qc_metrics.html",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/embedding/neighbor_graph.html"
+        ],
+        "clustering_summary": {
+            "n_clusters": 8,
+            "leiden_resolution": 0.6,
+            "modularity_score": 0.734,
+            "cluster_sizes": [1247, 892, 445, 287, 201, 189, 156, 139],
+            "silhouette_score": 0.312
+        }
+    }
+    ```
+    
+    Generated Plots:
+    1. UMAP Clusters: 2D visualization colored by Leiden clusters
+    2. UMAP QC Metrics: Embedding colored by quality control metrics
+    3. Neighborhood Graph: Network visualization of cell-cell relationships
+    
+    HTTP Status Codes:
+    - `200`: Successful embedding and clustering
+    - `404`: UUID not found or PCA not completed
+    - `422`: Invalid parameters (n_pcs > available PCs, resolution out of range)
+    - `500`: Computation error (memory issues, convergence problems)
+    
+    Processing Time: 5-30 minutes depending on dataset size and parameters
+    
+    Interpretation Guidelines:
+    - Good Clustering: Distinct, compact clusters with biological interpretation
+    - Over-clustering: Too many small clusters, increase resolution
+    - Under-clustering: Mixed cell types in clusters, decrease resolution
+    - UMAP Quality: Well-separated clusters without excessive fragmentation
+    
+    Parameter Tuning Tips:
+    - Start with defaults, then adjust based on results
+    - Use prior biological knowledge about expected cell types
+    - Check cluster stability by varying resolution ±0.2
+    
+    Next Steps: 
+    - Use `/genes_visualization/` for marker gene expression
+    - Use `/DEA/` for differential expression analysis between clusters
+    """
+    dir_path = os.path.join(UPLOAD_FOLDER, file_uuid)
+    file_path = os.path.join(dir_path, f"{file_uuid}.h5ad")
+    matching_files = glob.glob(file_path)
+    
+    if not matching_files:
+        return {"error": "Archivo no encontrado."}
+    
+    embedding_plots_directory = os.path.join(dir_path,"embedding")
+    if not os.path.exists(embedding_plots_directory):
+        os.makedirs(embedding_plots_directory)
+        
+    actual_file_path = matching_files[0]
+    
+    if not os.path.exists(actual_file_path):
+        raise HTTPException(status_code=404, detail="File not found in the upload folder")
+    
+    root_path = UPLOAD_FOLDER
+
+    cmd = [
+        "sbatch",
+        "--job-name=embedding_clustering",
+        f"--output={os.path.join(UPLOAD_FOLDER, file_uuid, f'embedding/embedding_clustering.out')}",
+        f"--error={os.path.join(UPLOAD_FOLDER, file_uuid, f'embedding/embedding_clustering.err')}",
+        "slurm_scripts/slurm_embedding_clust.sh",
+        actual_file_path,
+        embedding_plots_directory,
+        str(params.n_neighbors),
+        str(params.n_pcs),
+        str(params.resolution),
+        root_path,
+        file_uuid
+    ]
+    
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    print(f"sbatch result: {result.stdout.strip()}")
+    
+    slurm_job_id = result.stdout.strip().split()[-1]
+    print(f"SLURM JOB ID: {slurm_job_id}")
+        
+    job_status = await wait_for_job_completion(slurm_job_id)   
+    output_contents = ""
+     
+    if job_status == "COMPLETED":
+        output_file_path = f"uploads/{file_uuid}/embedding/embedding_clustering.out"
+        output_contents = await read_output_file(output_file_path)
+
+    else:
+        raise HTTPException(status_code=404, detail="Output file not found.")   
+    
+    try:
+        embedding_plot_paths = eval(output_contents)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to return umap file paths: {e}")
+    
+    update_config(
+    file_uuid,
+    {
+        "n_pcs": params.n_pcs,
+        "n_neighbors": params.n_neighbors,
+        "leiden_resolution": params.resolution
+    }
+    )
+    return {
+        "file_uuid": file_uuid, 
+        "embedding_plot_paths": embedding_plot_paths,
+        "message": "Embedding and clustering done."
+    }
+    
+    # clusters,embedding_plot_paths = run_clustering_on_data(file_path=actual_file_path,n_neighbors=params.n_neighbors,n_pcs=params.n_pcs,save_path=embedding_plots_directory)
+    
+    # conn = get_db()
+    # cursor = conn.cursor()
+    # # Update the database
+    # cursor.execute("""
+    # UPDATE processing_info 
+    # SET n_neighbors = ?, n_pcs = ?, clusters = ?
+    # WHERE task_id = (SELECT id FROM tasks WHERE uuid = ?)
+    # """, (params.n_neighbors, params.n_pcs, clusters, file_uuid))
+    # conn.commit()
+    # conn.close()
+    
+    # return {
+    #     "file_uuid": file_uuid, 
+    #     "clusters": clusters, 
+    #     "embedding_plot_paths": embedding_plot_paths,
+    #     "message": "Embedding and clustering done."
+    # }
+    
+@app.post("/genes_visualization/", tags=["🎨 Step 5: Visualization"], summary="Step 5: Gene Expression Visualization")
+async def visualization(vis: VisualizationWithTheme):
+    """
+    Create gene expression overlay plots on UMAP/PCA embeddings.
+    
+    Visualize the expression patterns of specific genes across your cell populations,
+    essential for validating clustering results and understanding cell type identities.
+    
+    Use Cases:
+    - Marker Validation: Confirm cluster-specific expression of known markers
+    - Gene Discovery: Explore expression patterns of candidate genes
+    - Quality Control: Check technical genes (mitochondrial, ribosomal)
+    - Pathway Analysis: Visualize genes from biological pathways
+    
+    Request Body (VisualizationInput):
+    - file_uuid: str - UUID from completed embedding analysis
+      - Must have UMAP or other dimensionality reduction computed
+    - dim_red: str - Embedding method for visualization
+      - `"umap"`: UMAP embedding (most common, recommended)
+      - `"pca"`: PCA space (first 2 components)
+      - `"tsne"`: t-SNE embedding (if computed)
+      - `"spatial"`: Spatial coordinates (for spatial transcriptomics)
+    - gene_list: List[str] - Gene symbols to visualize
+      - Examples: ["CD4", "CD8A", "FOXP3"] for T cell analysis
+      - Gene names must match those in your dataset (case-sensitive)
+      - Maximum: 20 genes per request (performance limit)
+      - Use `/gene_names` endpoint to check available genes
+    
+    Example Request:
+    ```json
+    {
+        "file_uuid": "550e8400-e29b-41d4-a716-446655440000",
+        "dim_red": "umap",
+        "gene_list": ["CD3D", "CD4", "CD8A", "MS4A1", "LYZ"]
+    }
+    ```
+    
+    Returns:
+    ```json
+    {
+        "gene_expression_plots": [
+            "uploads/550e8400-e29b-41d4-a716-446655440000/visualization/umap_CD3D.html",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/visualization/umap_CD4.html",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/visualization/umap_CD8A.html",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/visualization/umap_MS4A1.html",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/visualization/umap_LYZ.html",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/visualization/combined_expression_plot.html"
+        ],
+        "gene_statistics": {
+            "CD3D": {"mean_expression": 2.34, "pct_expressing": 67.8, "max_expression": 8.92},
+            "CD4": {"mean_expression": 1.87, "pct_expressing": 45.2, "max_expression": 7.23},
+            "CD8A": {"mean_expression": 1.45, "pct_expressing": 38.9, "max_expression": 6.78}
+        },
+        "genes_not_found": [],
+        "visualization_summary": {
+            "embedding_method": "umap",
+            "genes_visualized": 5,
+            "color_scale": "viridis",
+            "expression_units": "log1p_normalized"
+        }
+    }
+    ```
+    
+    Plot Features:
+    - Individual Gene Plots: Separate UMAP plot for each gene with expression overlay
+    - Combined Plot: Multi-panel view of all genes together
+    - Color Scale: Continuous color mapping from low (blue) to high (yellow/red) expression
+    - Interactive: Hover tooltips with cell information and exact expression values
+    
+    HTTP Status Codes:
+    - `200`: Successful visualization generation
+    - `404`: UUID not found or embedding not computed
+    - `422`: Invalid gene names, unsupported dim_red method, or too many genes
+    - `500`: Plotting error or memory issues
+    
+    Processing Time: 2-10 minutes depending on number of genes and cells
+    
+    Gene Name Guidelines:
+    - Use official gene symbols (HUGO for human, MGI for mouse)
+    - Gene names are case-sensitive: "CD4" not "cd4"
+    - Check gene availability with `/gene_names/{uuid}` endpoint first
+    - Some datasets may use Ensembl IDs instead of symbols
+    
+    Interpretation Tips:
+    - High Expression: Bright colors indicate strong gene expression
+    - Cluster Specificity: Markers should show clear cluster-restricted patterns
+    - Expression Gradients: Some genes show continuous variation across cell states
+    - Technical Artifacts: Check for batch effects or outlier cells
+    
+    Common Gene Sets:
+    - T cells: CD3D, CD3E, CD4, CD8A, CD8B
+    - B cells: MS4A1 (CD20), CD79A, CD79B, PAX5
+    - Myeloid: LYZ, CD68, CD14, FCGR3A
+    - QC genes: Mitochondrial (MT-*), ribosomal (RP*), stress (HSP*)
+    
+    Next Steps: Use these visualizations to interpret your clustering and annotate cell types.
+    """
+    dir_path = os.path.join(UPLOAD_FOLDER, vis.file_uuid)
+    file_path = os.path.join(dir_path, f"{vis.file_uuid}.h5ad")
+    matching_files = glob.glob(file_path)
+    
+    if not matching_files:
+        return {"error": "Archivo no encontrado."}
+    
+    genes_plots_directory = os.path.join(dir_path,"visualization")
+    
+    if not os.path.exists(genes_plots_directory):
+        os.makedirs(genes_plots_directory)
+    actual_file_path = matching_files[0]
+    
+    # Handle theme settings
+    if vis.custom_theme:
+        # Apply custom theme
+        from plot_themes import PlotTheme
+        custom_theme = PlotTheme.from_dict(vis.custom_theme.dict())
+        theme_manager.add_custom_theme(custom_theme)
+        theme_manager.set_current_theme(custom_theme.theme_name)
+    elif vis.theme_name and vis.theme_name != "default":
+        # Apply predefined theme
+        theme_manager.set_current_theme(vis.theme_name)
+    
+    
+    cmd = [
+        "sbatch",
+        "--job-name=visualization",
+        f"--output={os.path.join(UPLOAD_FOLDER, vis.file_uuid, f'visualization/visualization.out')}",
+        f"--error={os.path.join(UPLOAD_FOLDER, vis.file_uuid, f'visualization/visualization.err')}",
+        "slurm_scripts/slurm_visualization.sh",
+        actual_file_path,
+        genes_plots_directory,
+        vis.dim_red,
+        str(vis.gene_list)
+    ]
+    
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    print(f"sbatch result: {result.stdout.strip()}")
+    
+    slurm_job_id = result.stdout.strip().split()[-1]
+    print(f"SLURM JOB ID: {slurm_job_id}") 
+    job_status = await wait_for_job_completion(slurm_job_id)
+    output_contents = ""
+
+    if job_status == "COMPLETED":
+        output_file_path = f"uploads/{vis.file_uuid}/visualization/visualization.out"
+        output_contents = await read_output_file(output_file_path)
+
+    else:
+        raise HTTPException(status_code=404, detail="Output file not found.")   
+    
+    try:
+        genes_plot_paths = eval(output_contents)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to return visualization file paths: {e}")
+    
+    return genes_plot_paths    
+    
+
+# ── list adata.var columns ───────────────────────────────────────────────
+@app.post("/var_names", tags=["ℹ️ Dataset Information"])
+async def var_names(uuid: str):
+    dir_path = os.path.join(UPLOAD_FOLDER, uuid)
+    adata_path = os.path.join(dir_path, f"{uuid}.h5ad")
+    if not os.path.exists(adata_path):
+        raise HTTPException(status_code=404, detail="File not found.")
+    try:
+        adata = sc.read_h5ad(adata_path, backed="r")
+        columns = list(adata.var.columns)
+        adata.file.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return columns
+
+
+# ── create UMAP/PCA colored by an adata.var column ───────────────────────
+@app.post("/var_visualization/", tags=["🎨 Step 5: Visualization"])
+async def var_visualization_endpoint(vis: VarVisualizationInput):
+    dir_path = os.path.join(UPLOAD_FOLDER, vis.file_uuid)
+    adata_path = os.path.join(dir_path, f"{vis.file_uuid}.h5ad")
+    if not os.path.exists(adata_path):
+        raise HTTPException(status_code=404, detail="File not found.")
+
+    plots_dir = os.path.join(dir_path, "var_vis")
+    os.makedirs(plots_dir, exist_ok=True)
+
+    cmd = [
+        "sbatch",
+        "--job-name=var_vis",
+        f"--output={os.path.join(plots_dir, 'var_vis.out')}",
+        f"--error={os.path.join(plots_dir, 'var_vis.err')}",
+        "slurm_scripts/slurm_var_visualization.sh",
+        adata_path,
+        plots_dir,
+        vis.dim_red,
+        vis.var_key,
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    slurm_id = result.stdout.strip().split()[-1]
+
+    status = await wait_for_job_completion(slurm_id)
+    if status != "COMPLETED":
+        raise HTTPException(status_code=500, detail=f"SLURM job failed ({status})")
+
+    output_txt = await read_output_file(os.path.join(plots_dir, "var_vis.out"))
+    try:
+        paths = ast.literal_eval(output_txt)   # should be ["uploads/<uuid>/var_vis/...png"]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Parse error: {e}")
+
+    return paths
+
+
+
+@app.post("/gene_names", tags=["ℹ️ Dataset Information"], summary="Get Available Gene Names")
+async def gene_names(uuid: str): 
+    """
+    Retrieve all available gene names from a processed dataset.
+    
+    This utility endpoint returns the complete list of gene symbols/identifiers
+    present in your dataset. Essential for validating gene names before using
+    visualization or differential expression endpoints.
+    
+    Use Cases:
+    - Gene Validation: Check if specific genes exist in your dataset
+    - Marker Selection: Browse available genes for visualization
+    - Quality Control: Verify gene naming conventions and completeness
+    - API Integration: Programmatically access gene lists for automation
+    
+    Parameters:
+    - uuid: str - UUID of any processed dataset
+      - Must have completed upload and processing steps
+      - Works with any stage of analysis (post-upload, post-QC, post-clustering)
+    
+    Returns:
+    ```json
+    [
+        "TSPAN6", "TNMD", "DPM1", "SCYL3", "C1orf112",
+        "FGR", "CFH", "FUCA2", "GCLC", "NFYA",
+        "CD3D", "CD3E", "CD4", "CD8A", "MS4A1",
+        "..."
+    ]
+    ```
+    
+    Response Details:
+    - Format: JSON array of strings
+    - Gene Names: Official symbols (HUGO for human, MGI for mouse)
+    - Count: Typically 15,000-25,000 genes after quality filtering
+    - Sorting: Alphabetical order for easy searching
+    - Case Sensitivity: Exact capitalization as stored in dataset
+    
+    Common Gene Patterns:
+    - Human: Uppercase (CD4, GAPDH, TP53)
+    - Mouse: Sentence case (Cd4, Gapdh, Tp53)
+    - Mitochondrial: MT- prefix (human) or mt- (mouse)
+    - Ribosomal: RP* prefix for ribosomal proteins
+    - Pseudogenes: Often contain numbers/special characters
+    
+    HTTP Status Codes:
+    - `200`: Successfully retrieved gene list
+    - `404`: UUID not found or dataset not processed
+    - `500`: File access error or corrupted data
+    
+    Processing Time: <30 seconds for most datasets
+    
+    Usage Examples:
+    ```python
+    # Check if T cell markers are available
+    genes = response.json()
+    t_cell_markers = ['CD3D', 'CD4', 'CD8A', 'FOXP3']
+    available_markers = [g for g in t_cell_markers if g in genes]
+    ```
+    
+    Next Steps: Use returned gene names with `/genes_visualization/` endpoint for expression plots.
+    """
+    dir_path = os.path.join(UPLOAD_FOLDER, uuid)
+    file_path = os.path.join(dir_path, f"{uuid}.h5ad")
+    matching_files = glob.glob(file_path)
+    
+    if not matching_files:
+        return {"error": "Archivo no encontrado."}
+    
+    embedding_plots_directory = os.path.join(dir_path,"embedding")
+    if not os.path.exists(embedding_plots_directory):
+        os.makedirs(embedding_plots_directory)
+        
+    actual_file_path = matching_files[0]
+    
+    if not os.path.exists(actual_file_path):
+        raise HTTPException(status_code=404, detail="File not found in the upload folder")
+    
+    
+    cmd = [
+        "sbatch",
+        "--job-name=embedding_gene_names",
+        f"--output={os.path.join(UPLOAD_FOLDER, uuid, f'embedding/embedding_gene_names.out')}",
+        f"--error={os.path.join(UPLOAD_FOLDER, uuid, f'embedding/embedding_gene_names.err')}",
+        "slurm_scripts/slurm_gene.sh",
+        actual_file_path,
+    ]
+    
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    print(f"sbatch result: {result.stdout.strip()}")
+    
+    slurm_job_id = result.stdout.strip().split()[-1]
+    print(f"SLURM JOB ID: {slurm_job_id}") 
+            
+    job_status = await wait_for_job_completion(slurm_job_id)
+    output_contents = ""
+
+    if job_status == "COMPLETED":
+        output_file_path = f"uploads/{uuid}/embedding/embedding_gene_names.out"
+        output_contents = await read_output_file(output_file_path)
+
+    else:
+        raise HTTPException(status_code=404, detail="Output file not found.")   
+    
+    try:
+        output_contents = eval(output_contents)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to return genes names: {e}")
+    
+    return output_contents
+
+@app.get("/info/{file_uuid}/", tags=["ℹ️ Dataset Information"], summary="Get Analysis Status & Metadata")
+async def get_info(file_uuid: str):
+    """
+    Retrieve comprehensive analysis metadata and processing history.
+    
+    This endpoint provides a complete overview of an analysis including all parameters,
+    statistics, and processing steps completed. Essential for tracking analysis progress,
+    reproducing results, and generating analysis reports.
+    
+    Information Included:
+    - Basic Metadata: Analysis name, creation date, species, contact info
+    - Processing Parameters: All QC thresholds and method selections used
+    - Data Statistics: Cell/gene counts at each processing step
+    - Analysis Progress: Which steps have been completed
+    - Quality Metrics: Processing success rates and filtering statistics
+    
+    Parameters:
+    - file_uuid: str - UUID of the analysis
+      - Returns information for any stage of analysis
+      - More details available for completed processing steps
+    
+    Returns:
+    ```json
+    {
+        "id": 42,
+        "uuid": "550e8400-e29b-41d4-a716-446655440000",
+        "file_path": "uploads/550e8400-e29b-41d4-a716-446655440000/550e8400-e29b-41d4-a716-446655440000.h5ad",
+        "species": "human",
+        "email": "researcher@university.edu",
+        "analysisName": "PBMC_treatment_vs_control",
+        "created_at": "2024-01-15 14:30:22",
+        "cells_number_pre_processing": 2700,
+        "genes_number_pre_processing": 32738,
+        "cells_number_post_processing": 2456,
+        "genes_number_post_processing": 18245,
+        "min_genes": 200,
+        "min_cells": 3,
+        "mito_threshold": 20.0,
+        "n_neighbors": 15,
+        "n_pcs": 18,
+        "clusters": 8,
+        "processing_status": {
+            "upload_completed": true,
+            "qc_completed": true,
+            "pca_completed": true,
+            "embedding_completed": true,
+            "dea_completed": false
+        }
+    }
+    ```
+    
+    Field Descriptions:
+    - Basic Info: uuid, analysisName, species, email, created_at
+    - File Paths: Locations of processed data files
+    - Pre-processing: Original dataset dimensions
+    - Post-processing: Filtered dataset dimensions  
+    - QC Parameters: Thresholds used for filtering
+    - Analysis Parameters: PCA/embedding settings used
+    - Results: Number of clusters identified
+    
+    Processing Status Indicators:
+    - `null` values: Step not yet completed
+    - Numeric values: Step completed with these parameters
+    - Use to determine what analysis steps are available
+    
+    HTTP Status Codes:
+    - `200`: Analysis information retrieved successfully
+    - `404`: UUID not found in database
+    - `500`: Database access error
+    
+    Processing Time: <5 seconds
+    
+    Use Cases:
+    - Progress Tracking: Check which analysis steps are complete
+    - Parameter Review: Verify settings used for reproducibility
+    - Quality Assessment: Review filtering statistics and cell retention
+    - Report Generation: Extract metadata for analysis summaries
+    - API Integration: Programmatically check analysis status
+    
+    Next Steps: Use this information to determine which endpoints are ready to use.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+    SELECT t.*, p.*
+    FROM tasks t
+    LEFT JOIN processing_info p ON t.id = p.task_id
+    WHERE t.uuid = ?
+    """, (file_uuid,))
+    data = cursor.fetchone()
+
+    # Get column names
+    columns = [description[0] for description in cursor.description]
+    conn.close()
+
+    if not data:
+        return {"error": "No data found for given UUID."}
+
+    # Convert the tuple data to a dictionary with column names as keys
+    result = dict(zip(columns, data))
+    return result
+
+
+@app.post("/DEA/", tags=["🔬 Step 6: Differential Expression"], summary="Step 6: Differential Expression Analysis")
+async def DEA(file_uuid: str, n_genes: int, flavor: str, method : str = 'wilcoxon',gene_list: list[str] = None):
+    """
+    Perform comprehensive differential expression analysis between cell clusters.
+    
+    This endpoint identifies marker genes that distinguish different cell types/clusters,
+    enabling biological interpretation and cell type annotation of your scRNA-seq data.
+    
+    Analysis Methods:
+    - Cluster vs Rest: Find genes specific to each cluster compared to all others
+    - Pairwise Comparisons: Compare expression between all cluster pairs  
+    - Statistical Testing: Multiple robust statistical methods available
+    - Visualization: Generate heatmaps, dot plots, and volcano plots
+    
+    Parameters:
+    - file_uuid: str - UUID from clustering analysis
+      - Must have completed embedding/clustering steps
+    - n_genes: int - Number of top marker genes per cluster
+      - Range: 10-1000, typical values: 25-100
+      - More genes: Comprehensive view but harder to interpret
+      - Fewer genes: Focus on strongest markers only
+      - Recommended: 50 for exploration, 25 for focused analysis
+    - flavor: str - Analysis scope and output format
+      - `"marker_genes"`: Find top markers for each cluster (recommended)
+      - `"pairwise"`: All pairwise cluster comparisons (comprehensive)
+      - `"custom"`: Use provided gene_list for targeted analysis
+      - `"pathway"`: Gene set enrichment analysis (if available)
+    - method: str - Statistical test method (default: "wilcoxon")
+      - `"wilcoxon"`: Non-parametric, robust, recommended for most cases
+      - `"t-test"`: Parametric, faster, assumes normal distribution  
+      - `"t-test_overestim_var"`: T-test with overestimated variance
+      - `"logreg"`: Logistic regression, good for binary classification
+    - gene_list: Optional[List[str]] - Specific genes to analyze
+      - Use when flavor="custom"
+      - Gene symbols (e.g., ["CD4", "CD8A", "FOXP3"])
+      - Leave None for genome-wide analysis
+    
+    Example Request:
+    ```json
+    {
+        "file_uuid": "550e8400-e29b-41d4-a716-446655440000",
+        "n_genes": 50,
+        "flavor": "marker_genes", 
+        "method": "wilcoxon",
+        "gene_list": null
+    }
+    ```
+    
+    Returns:
+    ```json
+    {
+        "dea_plot_paths": [
+            "uploads/550e8400-e29b-41d4-a716-446655440000/dea/marker_genes_heatmap.html",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/dea/dotplot_top_markers.html",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/dea/volcano_plots_by_cluster.html",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/dea/marker_genes_ranking.html"
+        ],
+        "dea_summary": {
+            "total_marker_genes_found": 347,
+            "clusters_analyzed": 8,
+            "statistical_method": "wilcoxon",
+            "min_pct_threshold": 0.25,
+            "logfc_threshold": 0.25,
+            "adj_pvalue_threshold": 0.05
+        },
+        "top_markers_per_cluster": {
+            "cluster_0": ["IL7R", "CCR7", "CD40LG"],
+            "cluster_1": ["CD8A", "CD8B", "CCL5"],
+            "cluster_2": ["MS4A1", "CD79A", "CD79B"]
+        },
+        "csv_files_generated": [
+            "uploads/550e8400-e29b-41d4-a716-446655440000/dea/results/cluster_0_markers.csv",
+            "uploads/550e8400-e29b-41d4-a716-446655440000/dea/results/cluster_1_markers.csv"
+        ]
+    }
+    ```
+    
+    Generated Files:
+    1. CSV Results: Detailed statistics for each marker gene
+    2. Heatmap: Expression of top markers across clusters
+    3. Dot Plot: Marker expression levels and detection rates
+    4. Volcano Plots: Statistical significance vs fold change
+    5. Gene Rankings: Ordered lists of markers by cluster
+    
+    CSV Columns Include:
+    - `gene`: Gene symbol
+    - `cluster`: Cluster identifier  
+    - `avg_log2FC`: Average log2 fold change
+    - `pct.1`: Percentage of cells expressing gene in cluster
+    - `pct.2`: Percentage of cells expressing gene in other clusters
+    - `p_val_adj`: Adjusted p-value (Bonferroni correction)
+    
+    HTTP Status Codes:
+    - `200`: Successful differential expression analysis
+    - `404`: UUID not found or clustering not completed
+    - `422`: Invalid parameters (unknown method, invalid gene names)
+    - `500`: Analysis error (insufficient cells per cluster, memory issues)
+    
+    Processing Time: 10-45 minutes depending on dataset size and number of clusters
+    
+    Result Interpretation:
+    - Good Markers: High log2FC (>1), high detection rate in cluster (>50%), low p-value (<0.05)
+    - Cell Type Annotation: Use marker genes with known literature/databases (CellMarker, PanglaoDB)
+    - Quality Check: Each cluster should have several specific markers
+    
+    Next Steps:
+    - Download CSV files using `/download_dea_results/{uuid}`
+    - Use marker genes for cell type annotation
+    - Validate results with `/genes_visualization/` for specific markers
+    """
+    # print(f"Received: {file_uuid}, {n_genes}, {flavor}, {gene_list}") 
+    dir_path = os.path.join(UPLOAD_FOLDER, file_uuid)
+    file_path = os.path.join(dir_path, f"{file_uuid}.h5ad")
+    matching_files = glob.glob(file_path)
+    
+    if not matching_files:
+        return {"error": "File not found."}
+    
+    dea_plots_directory = os.path.join(dir_path, "dea")
+    
+    if not os.path.exists(dea_plots_directory):
+        os.makedirs(dea_plots_directory)
+    actual_file_path = matching_files[0]
+    
+    gene_list_str = json.dumps(gene_list) if gene_list else "[]"
+    root_path = UPLOAD_FOLDER
+
+    cmd = [
+        "sbatch",
+        "--job-name=dea",
+        f"--output={os.path.join(UPLOAD_FOLDER, file_uuid, 'dea/dea.out')}",
+        f"--error={os.path.join(UPLOAD_FOLDER, file_uuid, 'dea/dea.err')}",
+        "slurm_scripts/slurm_dea.sh",
+        actual_file_path,
+        dea_plots_directory,
+        str(n_genes),
+        flavor,
+        gene_list_str,
+        method,
+        root_path,
+        file_uuid
+    ]
+    
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    print(f"sbatch result: {result.stdout.strip()}")
+    
+    slurm_job_id = result.stdout.strip().split()[-1]
+    print(f"SLURM JOB ID: {slurm_job_id}") 
+    job_status = await wait_for_job_completion(slurm_job_id)
+    output_contents = ""
+    output_file_path = f"uploads/{file_uuid}/dea/dea.out"
+    update_config(
+    file_uuid,
+    {
+        "number_of_genes": n_genes,
+        "statistical_method": method
+    }
+    )
+    if job_status == "COMPLETED" and os.path.exists(output_file_path):
+        output_contents = await read_output_file(output_file_path)
+        try:
+            dea_plot_paths = eval(output_contents)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to return DEA path: {e}")
+        return dea_plot_paths
+    else:
+        detail_msg = "Job did not complete successfully or output file was not found."
+        raise HTTPException(status_code=404, detail=detail_msg)
+
+
+@app.post("/scanpy_export", tags=["📥 Export & Download"], summary="Export to Scanpy (.h5ad)")
+async def export_to_scanpy(uuid:str):
+    """
+    Export the processed single-cell RNA-seq analysis results to Scanpy (.h5ad) format.
+
+    Parameters:
+    - uuid: str - UUID of the analysis task
+
+    Returns:
+    - A FileResponse containing the exported Scanpy (.h5ad) file
+    """
+    scanpy_path = f"uploads/{uuid}/{uuid}.h5ad" 
+    if os.path.exists(scanpy_path):
+        return FileResponse(path=scanpy_path, filename=f"{uuid}.h5ad")
+    else:
+        raise HTTPException(status_code=404, detail="File not found.") 
+    
+# ── Seurat export endpoint ──────────────────────────────────────────────────────
+@app.post("/seurat_export", tags=["📥 Export & Download"], summary="Export to Seurat (.rds)")
+async def export_to_seurat(uuid: str):
+    """
+    Launch a SLURM job that converts the analysis to a Seurat (.rds) file,
+    wait until the job finishes, and return the resulting file.
+    """
+    # Submit the job
+    cmd = [
+        "sbatch",
+        "--job-name=seurat_export",
+        f"--output={os.path.join(UPLOAD_FOLDER, uuid, 'seurat_export.out')}",
+        f"--error={os.path.join(UPLOAD_FOLDER, uuid, 'seurat_export.err')}",
+        "slurm_scripts/slurm_seurat_export.sh",
+        uuid,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    slurm_job_id = result.stdout.strip().split()[-1]
+    print(f"SLURM JOB ID: {slurm_job_id}")
+
+    # Wait for completion
+    job_status = await wait_for_job_completion(slurm_job_id)
+    if job_status != "COMPLETED":
+        raise HTTPException(status_code=500, detail="SLURM job failed.")
+
+    # Path of the RDS file created by the SLURM script
+    file_path = os.path.join(UPLOAD_FOLDER, uuid, f"{uuid}.rds")
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Exported file not found.")
+
+    return FileResponse(path=file_path, filename=f"{uuid}.rds")
+    
+@app.post("/clustree", tags=["🎨 Step 5: Visualization"], summary="Generate Clustree Plot")
+async def clustree_R(uuid: str):
+    # 1) Ensure embedding folder exists
+    embedding_dir = os.path.join(UPLOAD_FOLDER, uuid, "embedding")
+    os.makedirs(embedding_dir, exist_ok=True)
+
+    # 2) Submit the Slurm job
+    result = subprocess.run(
+        [
+            "sbatch",
+            "--job-name=clustree",
+            f"--output={os.path.join(embedding_dir, 'clustree.out')}",
+            f"--error={os.path.join(embedding_dir, 'clustree.err')}",
+            "slurm_scripts/slurm_seurat_clustree.sh",
+            uuid,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    slurm_job_id = result.stdout.strip().split()[-1]
+
+    # 3) Wait for Slurm to finish
+    status = await wait_for_job_completion(slurm_job_id)
+    if status != "COMPLETED":
+        raise HTTPException(
+            status_code=500, detail=f"Clustree job failed (status={status})"
+        )
+
+    # 4) Directly build the expected SVG path
+    svg_path = os.path.join(UPLOAD_FOLDER, uuid, "embedding", "clustreePlot.svg")
+    if not os.path.exists(svg_path):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Clustree plot not found at {svg_path}"
+        )
+
+    # 5) Serve it
+    return FileResponse(path=svg_path, filename="clustreePlot.svg")
+    
+    
+@app.get("/export-files/{uuid}", tags=["📥 Export & Download"], summary="Download All Analysis Files (ZIP)")
+async def export_files(uuid: str):
+    """
+    Export all analysis files and results for a single-cell RNA-seq analysis task as a ZIP archive.
+
+    Parameters:
+    - uuid: str - UUID of the analysis task
+
+    Returns:
+    - A FileResponse containing a ZIP file with all analysis plots, data, and results
+    """
+
+    base_path = os.path.join(UPLOAD_FOLDER, uuid)
+    if not os.path.exists(base_path):
+        raise HTTPException(status_code=404, detail="UUID not found")
+
+    # Define the name and path of the ZIP file
+    zip_filename = f"/tmp/{uuid}.zip"
+
+    # Create the ZIP archive
+    with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        # 1) Incluir config.txt si existe
+        cfg = os.path.join(base_path, "config.txt")
+        if os.path.exists(cfg):
+            zipf.write(cfg, arcname="config.txt")
+
+        # 2) Incluir PDF y todos los plots
+        for root, dirs, files in os.walk(base_path):
+            for file in files:
+                if file.endswith(('.html', '.svg', '.pdf')):
+                    file_path = os.path.join(root, file)
+                    # arcname preserva la estructura relativa dentro del ZIP
+                    arcname = os.path.relpath(file_path, base_path)
+                    zipf.write(file_path, arcname=arcname)
+
+    return FileResponse(
+        path=zip_filename,
+        media_type="application/zip",
+        filename=f"{uuid}.zip"
+    )
+
+     
+@app.get("/uploads/{plot_path:path}", tags=["📁 File Access"])
+async def serve_plot_raw_data(plot_path: str):
+    full_path = f"/app/uploads/{plot_path}"
+    # print(f"Trying to access: {full_path}")
+    # print(f"File exists: {os.path.exists(full_path)}")
+    # print(f"Directory contents: {os.listdir(os.path.dirname(full_path))}")
+    # full_path =  plot_path
+    # print(f"Trying to access: {full_path}")  
+
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="Plot not found.")
+    return FileResponse(full_path)
+
+
+@app.get("/plots_preprocessing/{plot_path:path}", tags=["📁 File Access"])
+async def serve_plot_plots_preprocessing(plot_path: str):
+    """
+    Serve raw plot data for a specific analysis task.
+
+    Parameters:
+    - plot_path: str - Path to the requested plot file
+
+    Returns:
+    - A FileResponse containing the requested plot file
+    """
+    full_path =  plot_path
+    print(f"Trying to access: {full_path}") 
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="Plot not found.")
+    return FileResponse(full_path)
+
+
+@app.get("/plots_pca_embedding/{plot_path:path}", tags=["📁 File Access"])
+async def serve_plot_plots_embedding(plot_path: str):
+    """
+    Serve raw plot data for a specific analysis task.
+
+    Parameters:
+    - plot_path: str - Path to the requested plot file
+
+    Returns:
+    - A FileResponse containing the requested plot file
+    """
+    full_path =  plot_path
+    print(f"Trying to access: {full_path}")  
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="Plot not found.")
+    return FileResponse(full_path)
+
+@app.get("/plots_embedding/{plot_path:path}", tags=["📁 File Access"])
+async def serve_plot_plots_embedding(plot_path: str):
+    """
+    Serve raw plot data for a specific analysis task.
+
+    Parameters:
+    - plot_path: str - Path to the requested plot file
+
+    Returns:
+    - A FileResponse containing the requested plot file
+    """
+    full_path =  plot_path
+    print(f"Trying to access: {full_path}")  
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="Plot not found.")
+    return FileResponse(full_path)
+
+@app.get("/plots_dea/{plot_path:path}", tags=["📁 File Access"])
+async def serve_plot_plots_dea(plot_path: str):
+    """
+    Serve raw plot data for a specific analysis task.
+
+    Parameters:
+    - plot_path: str - Path to the requested plot file
+
+    Returns:
+    - A FileResponse containing the requested plot file
+    """
+    full_path =  plot_path
+    print(f"Trying to access: {full_path}")  
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="Plot not found.")
+    return FileResponse(full_path)
+
+@app.get("/genes_vis/{plot_path:path}", tags=["📁 File Access"])
+async def serve_plot_plot_clustree(plot_path: str):
+    """
+    Serve raw plot data for a specific analysis task.
+
+    Parameters:
+    - plot_path: str - Path to the requested plot file
+
+    Returns:
+    - A FileResponse containing the requested plot file
+    """
+    full_path =  plot_path
+    print(f"Trying to access: {full_path}")  
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="Plot not found.")
+    return FileResponse(full_path)
+
+@app.get("/plots_clustree/{plot_path:path}", tags=["📁 File Access"])
+async def serve_plot_plot_clustree(plot_path: str):
+    """
+    Serve raw plot data for a specific analysis task.
+
+    Parameters:
+    - plot_path: str - Path to the requested plot file
+
+    Returns:
+    - A FileResponse containing the requested plot file
+    """
+    full_path =  plot_path
+    print(f"Trying to access: {full_path}")  
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="Plot not found.")
+    return FileResponse(full_path)
+
+
+@app.get("/get_obs/{csv_path:path}", tags=["📁 File Access"])
+async def serve_csv_file(csv_path: str):
+    """
+    Serve raw CSV file for a specific analysis task.
+
+    Parameters:
+    - csv_path: str - Path to the requested CSV file
+
+    Returns:
+    - A FileResponse containing the requested CSV file
+    """
+    full_path = csv_path
+    print(f"Trying to access: {full_path}")  
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="CSV not found.")
+    return FileResponse(full_path)
+
+
+@app.get("/get_var/{csv_path:path}", tags=["📁 File Access"])
+async def serve_csv_file(csv_path: str):
+    """
+    Serve raw CSV file for a specific analysis task.
+
+    Parameters:
+    - csv_path: str - Path to the requested CSV file
+
+    Returns:
+    - A FileResponse containing the requested CSV file
+    """
+    full_path = csv_path
+    print(f"Trying to access: {full_path}")  
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="CSV not found.")
+    return FileResponse(full_path)
+
+
+@app.get("/list_csv_files/{uuid}", tags=["ℹ️ Dataset Information"])
+async def list_csv_files(uuid: str):
+    """
+    List all CSV files for a specific analysis task.
+
+    Parameters:
+    - uuid: str - UUID for the specific analysis
+
+    Returns:
+    - A list of filenames present in the directory
+    """
+    directory = os.path.join(UPLOAD_FOLDER, uuid, "dea", "results")
+    if not os.path.exists(directory):
+        raise HTTPException(status_code=404, detail="Directory not found.")
+    
+    files = [f for f in os.listdir(directory) if f.endswith('.csv')]
+    return {"files": files}
+
+@app.get("/get_csv/{uuid}/{filename}", tags=["📁 File Access"])
+async def serve_csv_file(uuid: str, filename: str):
+    """
+    Serve raw CSV file for a specific analysis task.
+
+    Parameters:
+    - uuid: str - UUID for the specific analysis
+    - filename: str - Name of the CSV file
+
+    Returns:
+    - A FileResponse containing the requested CSV file
+    """
+    directory = os.path.join(UPLOAD_FOLDER, uuid, "dea", "results")
+    full_path = os.path.join(directory, filename)
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="CSV not found.")
+    return FileResponse(full_path)
+
+@app.get("/get_csv_data/{uuid}/{filename}", tags=["📁 File Access"])
+async def get_csv_data(uuid: str, filename: str):
+    """
+    Get CSV data as JSON for table display.
+
+    Parameters:
+    - uuid: str - UUID for the specific analysis
+    - filename: str - Name of the CSV file
+
+    Returns:
+    - JSON response with CSV data
+    """
+    directory = os.path.join(UPLOAD_FOLDER, uuid, "dea", "results")
+    full_path = os.path.join(directory, filename)
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="CSV not found.")
+    
+    try:
+        df = pd.read_csv(full_path)
+        return {"data": df.to_dict('records')}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading CSV: {str(e)}")
+
+
+
+def parse_scontrol_job_state(job_id):
+    """Retrieve and parse the job state from scontrol."""
+    cmd = ["scontrol", "show", "jobid", f"{str(job_id)}"]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    # print(f"scontrol : {result}")
+    if result.returncode != 0:
+        raise Exception(f"Failed to check job status: {result.stderr}")
+    
+    job_info = result.stdout
+    job_state = None
+    for line in job_info.splitlines():
+        if "JobState=" in line:
+            job_state = line.split("=")[1].split()[0]
+            break
+    return job_state
+
+async def wait_for_job_completion(job_id):
+    """Asynchronously wait for the job to complete or fail."""
+    while True:
+        status = parse_scontrol_job_state(job_id)
+        if status in ["COMPLETED", "FAILED"]:
+            return status
+        await asyncio.sleep(5)  # Check every 10 seconds
+
+def parse_output_content(output):
+    try:
+        # Find and evaluate the plot paths
+        plot_paths_match = re.search(r"Plot Paths: (\[.*?\])", output, re.S)
+        plot_paths = ast.literal_eval(plot_paths_match.group(1)) if plot_paths_match else []
+
+        # Find and evaluate the dataset description
+        dataset_desc_match = re.search(r"Dataset Description: ({.*?})", output, re.S)
+        dataset_description = ast.literal_eval(dataset_desc_match.group(1)) if dataset_desc_match else {}
+
+        return plot_paths, dataset_description
+
+    except Exception as e:
+        # Log any error that occurs during the parsing process
+        print(f"Error parsing output content: {e}")
+        return [], {}
+    
+    
+counter_file = 'visit_counter.json'
+
+def read_counter():
+    try:
+        with open(counter_file, "r") as file:
+            data = json.load(file)
+            return data['count']
+    except FileNotFoundError:
+        return 0
+
+def increment_counter():
+    count = read_counter()
+    count += 1
+    with open(counter_file, "w") as file:
+        json.dump({"count": count}, file)
+
+@app.get("/visit_counter")
+async def get_counter():
+    increment_counter()
+    return {"visit_count": read_counter()}    
+
+
+# ============================================================================
+# THEME MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@app.get("/themes/", tags=["🎨 Theme Management"], summary="List All Available Themes")
+async def list_themes():
+    """
+    **Get all available plot themes for visualization customization.**
+    
+    Returns a list of all predefined and custom themes available in the system.
+    Each theme includes a preview and description of its visual characteristics.
+    
+    **Returns:**
+    ```json
+    {
+        "themes": [
+            {
+                "name": "default",
+                "description": "Clean scientific theme with blue palette",
+                "category": "scientific",
+                "preview_colors": ["#1f77b4", "#ff7f0e", "#2ca02c"]
+            }
+        ],
+        "current_theme": "default"
+    }
+    ```
+    
+    **HTTP Status Codes:**
+    - `200`: Successfully retrieved theme list
+    - `500`: Server error
+    
+    **Use Cases:**
+    - Theme selection in UI dropdowns
+    - Preview themes before applying
+    - Discover accessibility themes
+    """
+    try:
+        theme_names = theme_manager.list_themes()
+        theme_info = []
+        
+        for name in theme_names:
+            theme = theme_manager.get_theme(name)
+            
+            # Get colors from plot_types instead of colors dict
+            preview_colors = []
+            if hasattr(theme, 'plot_types') and 'violin_plots' in theme.plot_types:
+                preview_colors = theme.plot_types['violin_plots'].get('colors', ['#1f77b4', '#ff7f0e', '#2ca02c'])
+            elif hasattr(theme, 'colors') and 'primary_palette' in theme.colors:
+                preview_colors = theme.colors['primary_palette']
+            else:
+                preview_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
+                
+            background_color = theme.global_settings.get('background_color', '#ffffff') if hasattr(theme, 'global_settings') else '#ffffff'
+            
+            theme_info.append({
+                "name": name,
+                "description": _get_theme_description(name),
+                "category": _get_theme_category(name),
+                "preview_colors": preview_colors[:5],
+                "background_color": background_color,
+                "is_accessible": hasattr(theme, 'accessibility') and any(theme.accessibility.values()) if hasattr(theme, 'accessibility') else False
+            })
+        
+        return {
+            "themes": theme_info,
+            "current_theme": theme_manager.current_theme,
+            "total_themes": len(theme_names)
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve themes: {str(e)}")
+
+
+@app.get("/themes/{theme_name}/", tags=["🎨 Theme Management"], summary="Get Theme Details")
+async def get_theme_details(theme_name: str):
+    """
+    **Get detailed information about a specific theme.**
+    
+    Provides comprehensive theme configuration including colors, fonts, 
+    layout settings, and accessibility options.
+    
+    **Parameters:**
+    - **theme_name**: str - Name of the theme to retrieve
+    
+    **Returns:**
+    Complete theme configuration with all customization options.
+    
+    **HTTP Status Codes:**
+    - `200`: Theme found and returned
+    - `404`: Theme not found
+    - `500`: Server error
+    """
+    try:
+        if theme_name not in theme_manager.list_themes():
+            raise HTTPException(status_code=404, detail=f"Theme '{theme_name}' not found")
+        
+        theme = theme_manager.get_theme(theme_name)
+        return {
+            "theme": theme.to_dict(),
+            "preview": create_theme_preview(theme)
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve theme: {str(e)}")
+
+
+@app.post("/themes/", tags=["🎨 Theme Management"], summary="Create Custom Theme")
+async def create_custom_theme(theme_request: PlotThemeRequest):
+    """
+    **Create a new custom theme with personalized settings.**
+    
+    Allows users to define their own color palettes, fonts, layouts,
+    and accessibility options for a completely customized visualization experience.
+    
+    **Request Body (PlotThemeRequest):**
+    Complete theme specification with validation for all parameters.
+    
+    **Returns:**
+    ```json
+    {
+        "message": "Theme created successfully",
+        "theme_name": "my_custom_theme",
+        "preview": {...}
+    }
+    ```
+    
+    **HTTP Status Codes:**
+    - `201`: Theme created successfully
+    - `400`: Invalid theme configuration
+    - `409`: Theme name already exists
+    - `422`: Validation errors in theme parameters
+    """
+    try:
+        # Check if theme already exists
+        if theme_request.theme_name in theme_manager.list_themes():
+            raise HTTPException(status_code=409, detail=f"Theme '{theme_request.theme_name}' already exists")
+        
+        # Create theme from request
+        theme = PlotTheme(theme_request.theme_name)
+        
+        # Update theme with custom settings
+        if theme_request.colors:
+            theme.colors.update(theme_request.colors.dict())
+            # Update plot-specific configurations with colors from the request
+            if hasattr(theme_request.colors, 'primary_palette'):
+                for plot_type in theme.plot_types:
+                    if 'colors' in theme.plot_types[plot_type]:
+                        theme.plot_types[plot_type]['colors'] = theme_request.colors.primary_palette
+        if theme_request.fonts:
+            theme.fonts.update(theme_request.fonts.dict())
+        if theme_request.layout:
+            theme.layout.update(theme_request.layout.dict())
+        if theme_request.markers:
+            theme.markers.update(theme_request.markers.dict())
+            # Update violin plot-specific settings with markers opacity and line_width
+            if hasattr(theme_request.markers, 'opacity'):
+                theme.plot_types['violin_plots']['opacity'] = theme_request.markers.opacity
+            if hasattr(theme_request.markers, 'line_width'):
+                theme.plot_types['violin_plots']['line_width'] = theme_request.markers.line_width
+        if theme_request.accessibility:
+            theme.accessibility.update(theme_request.accessibility.dict())
+            theme.apply_accessibility_options()
+        
+        # Add to theme manager
+        theme_manager.add_custom_theme(theme)
+        
+        return {
+            "message": "Theme created successfully",
+            "theme_name": theme.theme_name,
+            "preview": create_theme_preview(theme)
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create theme: {str(e)}")
+
+
+@app.put("/themes/current/{theme_name}/", tags=["🎨 Theme Management"], summary="Set Current Theme")
+async def set_current_theme(theme_name: str):
+    """
+    **Set the active theme for all subsequent plot generation.**
+    
+    Changes the global theme setting that will be used for all new plots
+    until changed again. Affects all visualization endpoints.
+    
+    **Parameters:**
+    - **theme_name**: str - Name of theme to activate
+    
+    **Returns:**
+    ```json
+    {
+        "message": "Theme set successfully",
+        "current_theme": "dark",
+        "previous_theme": "default"
+    }
+    ```
+    
+    **HTTP Status Codes:**
+    - `200`: Theme changed successfully
+    - `404`: Theme not found
+    - `500`: Server error
+    
+    **Note:** This affects all users globally. For production deployment,
+    consider implementing user-specific theme preferences.
+    """
+    try:
+        if theme_name not in theme_manager.list_themes():
+            raise HTTPException(status_code=404, detail=f"Theme '{theme_name}' not found")
+        
+        previous_theme = theme_manager.current_theme
+        theme_manager.set_current_theme(theme_name)
+        
+        return {
+            "message": "Theme set successfully",
+            "current_theme": theme_name,
+            "previous_theme": previous_theme
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to set theme: {str(e)}")
+
+
+@app.delete("/themes/{theme_name}/", tags=["🎨 Theme Management"], summary="Delete Custom Theme")
+async def delete_theme(theme_name: str):
+    """
+    Remove a custom theme from the server. Predefined themes cannot be removed.
+    
+    Returns current theme after deletion (may fallback to 'default' if removed theme was active).
+    """
+    try:
+        # Validate exists
+        if theme_name not in theme_manager.list_themes():
+            raise HTTPException(status_code=404, detail=f"Theme '{theme_name}' not found")
+        
+        # Attempt removal (raises ValueError if protected)
+        theme_manager.remove_theme(theme_name)
+        
+        return {
+            "message": f"Theme '{theme_name}' deleted",
+            "current_theme": theme_manager.current_theme,
+            "themes": theme_manager.list_themes()
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete theme: {str(e)}")
+
+
+@app.put("/themes/accessibility/", tags=["🎨 Theme Management"], summary="Update Theme Accessibility Settings")
+async def update_accessibility_settings(accessibility_settings: dict):
+    """
+    **Update accessibility settings for the current theme.**
+    
+    Applies accessibility options like high contrast, colorblind-friendly palettes,
+    and large text to the currently active theme.
+    
+    **Request Body:**
+    ```json
+    {
+        "high_contrast": true,
+        "colorblind_friendly": false,
+        "large_text": true,
+        "simplified_layout": false
+    }
+    ```
+    
+    **Returns:**
+    ```json
+    {
+        "message": "Accessibility settings updated",
+        "current_theme": "default",
+        "accessibility": {
+            "high_contrast": true,
+            "colorblind_friendly": false,
+            "large_text": true,
+            "simplified_layout": false
+        }
+    }
+    ```
+    """
+    try:
+        current_theme = theme_manager.get_theme()
+        
+        # Debug: Print before changes
+        print(f"BEFORE - Theme: {current_theme.theme_name}")
+        print(f"BEFORE - Primary palette: {current_theme.colors['primary_palette']}")
+        print(f"BEFORE - Continuous palette: {current_theme.colors['continuous_palette']}")
+        print(f"BEFORE - Accessibility: {current_theme.accessibility}")
+        
+        # Update accessibility settings
+        for key, value in accessibility_settings.items():
+            if key in current_theme.accessibility:
+                current_theme.accessibility[key] = value
+        
+        # Apply the accessibility options
+        current_theme.apply_accessibility_options()
+        
+        # Debug: Print after changes
+        print(f"AFTER - Primary palette: {current_theme.colors['primary_palette']}")
+        print(f"AFTER - Continuous palette: {current_theme.colors['continuous_palette']}")
+        print(f"AFTER - Accessibility: {current_theme.accessibility}")
+        
+        return {
+            "message": "Accessibility settings updated",
+            "current_theme": current_theme.theme_name,
+            "accessibility": current_theme.accessibility
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update accessibility settings: {str(e)}")
+
+
+def modify_plotly_html_colors_new(html_file_path: str, new_colors: list, file_uuid: str) -> bool:
+    """
+    Modify colors in Plotly HTML files using JavaScript injection for continuous scales
+    and direct replacement for discrete sequences.
+    """
+    try:
+        with open(html_file_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        import re
+        modified = False
+        
+        # Check if this is a continuous color scale plot (first parameter is a palette name)
+        is_continuous_plot = len(new_colors) > 0 and isinstance(new_colors[0], str) and new_colors[0].lower() in [
+            'viridis', 'plasma', 'inferno', 'magma', 'cividis', 'turbo', 'rainbow', 'greys', 'rdbu'
+        ]
+        
+        # Check if this is a discrete color injection (first parameter is "DISCRETE_PALETTE")
+        is_discrete_injection = len(new_colors) > 0 and new_colors[0] == "DISCRETE_PALETTE"
+        
+        if is_continuous_plot:
+            # Handle continuous color scale plots (PCA/UMAP) with JavaScript injection
+            new_palette = new_colors[0].capitalize()  # e.g., "Turbo"
+            
+            # Create JavaScript snippet to force the new colorscale
+            inject_snippet = f'''
+<script>
+(function() {{
+  function setColorscale(gd) {{
+    var n = (gd._fullData || []).length;
+    for (var i = 0; i < n; i++) {{
+      try {{ Plotly.restyle(gd, {{'marker.colorscale': '{new_palette}'}}, [i]); }} catch(e){{}}
+      try {{ Plotly.restyle(gd, {{'colorscale': '{new_palette}'}}, [i]); }} catch(e){{}}
+      try {{ Plotly.restyle(gd, {{'line.colorscale': '{new_palette}'}}, [i]); }} catch(e){{}}
+      try {{ Plotly.restyle(gd, {{'z': gd._fullData[i].z, 'colorscale': '{new_palette}'}}, [i]); }} catch(e){{}}
+    }}
+    if (gd._fullLayout) {{
+      Object.keys(gd._fullLayout).forEach(function(k){{
+        if (k.indexOf('coloraxis') === 0) {{
+          var u = {{}}; u[k + '.colorscale'] = '{new_palette}';
+          try {{ Plotly.relayout(gd, u); }} catch(e){{}}
+        }}
+      }});
+    }}
+  }}
+  function applyAll() {{
+    var graphs = document.querySelectorAll('.plotly-graph-div');
+    for (var j = 0; j < graphs.length; j++) setColorscale(graphs[j]);
+  }}
+  if (document.readyState === 'loading') {{
+    document.addEventListener('DOMContentLoaded', function(){{ setTimeout(applyAll, 100); }});
+  }} else {{
+    setTimeout(applyAll, 100);
+  }}
+}})();
+</script>
+'''
+            
+            # Inject before closing </body> tag
+            lower_html = html_content.lower()
+            body_end_idx = lower_html.rfind("</body>")
+            
+            if body_end_idx != -1:
+                html_content = html_content[:body_end_idx] + inject_snippet + html_content[body_end_idx:]
+                modified = True
+                print(f"Injected JavaScript to force colorscale: {new_palette}")
+            else:
+                # If no </body> tag, append at the end
+                html_content += inject_snippet
+                modified = True
+                print(f"Appended JavaScript to force colorscale: {new_palette}")
+        
+        elif is_discrete_injection:
+            # Handle discrete color palette injection using the robust JavaScript method
+            discrete_colors = new_colors[1:]  # Skip the "DISCRETE_PALETTE" signal
+            
+            # Create JavaScript snippet for discrete palette injection
+            discrete_inject_snippet = f'''
+<script>
+(function() {{
+  var PALETTE = {discrete_colors};
+  function arrayify(x){{ return Array.isArray(x) ? x : [x]; }}
+  function colorizeTrace(gd, traceIndex, color) {{
+    try {{ Plotly.restyle(gd, {{'marker.color': color}}, [traceIndex]); }} catch(e){{}}
+    try {{ Plotly.restyle(gd, {{'line.color': color}},   [traceIndex]); }} catch(e){{}}
+  }}
+  function recolor(gd) {{
+    var full = (gd && gd._fullData) || [];
+    var byKey = Object.create(null);
+    var next = 0;
+    for (var i = 0; i < full.length; i++) {{
+      var t = full[i] || {{}};
+      var hasScale = (t.marker && (t.marker.colorscale || t.marker.colorbar || t.marker.cmin !== undefined || t.marker.cmax !== undefined));
+      if (hasScale) continue;
+      var key = t.legendgroup || t.name || ("trace-"+i);
+      if (!(key in byKey)) {{
+        byKey[key] = PALETTE[next % PALETTE.length];
+        next++;
+      }}
+      if (t.marker && Array.isArray(t.marker.color)) {{
+        var arr = t.marker.color;
+        var map = Object.create(null);
+        var uniques = [];
+        for (var j=0; j<arr.length; j++) {{
+          var v = String(arr[j]);
+          if (!(v in map)) {{ map[v] = PALETTE[uniques.length % PALETTE.length]; uniques.push(v); }}
+        }}
+        var newArr = arr.map(function(v){{ return map[String(v)]; }});
+        try {{ Plotly.restyle(gd, {{'marker.color': [newArr]}}, [i]); }} catch(e){{}}
+      }} else {{
+        colorizeTrace(gd, i, byKey[key]);
+      }}
+    }}
+    try {{ Plotly.relayout(gd, {{'colorway': PALETTE}}); }} catch(e){{}}
+  }}
+  function run() {{
+    var graphs = document.querySelectorAll('.plotly-graph-div');
+    graphs.forEach(function(gd){{ recolor(gd); }});
+  }}
+  if (document.readyState === 'loading') {{
+    document.addEventListener('DOMContentLoaded', function(){{ setTimeout(run, 0); }});
+  }} else {{
+    setTimeout(run, 0);
+  }}
+}})();
+</script>
+'''
+            
+            # Inject before closing </body> tag
+            lower_html = html_content.lower()
+            body_end_idx = lower_html.rfind("</body>")
+            
+            if body_end_idx != -1:
+                html_content = html_content[:body_end_idx] + discrete_inject_snippet + html_content[body_end_idx:]
+                modified = True
+                print(f"Injected JavaScript for discrete palette: {len(discrete_colors)} colors")
+            else:
+                # If no </body> tag, append at the end
+                html_content += discrete_inject_snippet
+                modified = True
+                print(f"Appended JavaScript for discrete palette: {len(discrete_colors)} colors")
+        
+        else:
+            # Handle discrete color plots (violin, scatter, discrete UMAP) with direct replacement
+            color_sequence_pattern = r'"color_discrete_sequence":\s*\[(.*?)\]'
+            match = re.search(color_sequence_pattern, html_content)
+            
+            if match:
+                new_sequence = ', '.join([f'"{color}"' for color in new_colors])
+                new_color_array = f'"color_discrete_sequence": [{new_sequence}]'
+                html_content = re.sub(color_sequence_pattern, new_color_array, html_content)
+                modified = True
+                print(f"Updated color_discrete_sequence with new colors: {new_colors}")
+            
+            # Also look for discrete color maps (used by UMAP leiden plots) - don't use elif
+            if not modified:
+                discrete_map_pattern = r'"color_discrete_map":\s*\{([^}]*)\}'
+                map_match = re.search(discrete_map_pattern, html_content)
+                
+                if map_match and len(new_colors) > 0:
+                    old_map_content = map_match.group(1)
+                    # Extract the keys (cluster names) from the old map
+                    key_pattern = r'"([^"]+)":\s*"[^"]*"'
+                    keys = re.findall(key_pattern, old_map_content)
+                    
+                    # Create new color map with same keys but new colors
+                    new_map_entries = []
+                    for i, key in enumerate(keys):
+                        color = new_colors[i % len(new_colors)]
+                        new_map_entries.append(f'"{key}": "{color}"')
+                    
+                    new_map_content = ', '.join(new_map_entries)
+                    new_color_map = f'"color_discrete_map": {{{new_map_content}}}'
+                    html_content = re.sub(discrete_map_pattern, new_color_map, html_content)
+                    modified = True
+                    print(f"Updated color_discrete_map with {len(keys)} cluster colors from theme palette")
+            
+            # Handle elbow plots - independent check (not elif)
+            if not modified:
+                # Handle elbow plots - they use individual marker colors in arrays
+                # Look for marker color arrays like: "color": ["DarkGreen", "DarkGreen", "red", ...]
+                marker_color_pattern = r'"color":\s*\[(.*?)\]'
+                marker_match = re.search(marker_color_pattern, html_content, re.DOTALL)
+                
+                if marker_match and len(new_colors) >= 2:
+                    base_color, highlight_color = new_colors[0], new_colors[1]
+                    old_colors_str = marker_match.group(1)
+                    
+                    # Create comprehensive theme color mapping for intelligent replacement
+                    theme_color_map = {
+                        # All possible base colors from all themes
+                        "base_colors": [
+                            "DarkGreen",    # Default theme
+                            "#1abc9c",      # Dark theme
+                            "#0173b2",      # Colorblind theme
+                            "#ffffff",      # High contrast theme
+                            "#333333",      # Publication theme
+                            "#4ecdc4"       # Vibrant theme
+                        ],
+                        # All possible highlight colors from all themes
+                        "highlight_colors": [
+                            "red",          # Default theme
+                            "#e74c3c",      # Dark theme
+                            "#de8f05",      # Colorblind theme
+                            "#ff0000",      # High contrast theme
+                            "#666666",      # Publication theme
+                            "#ff6b6b"       # Vibrant theme
+                        ]
+                    }
+                    
+                    updated_colors = old_colors_str
+                    
+                    # Replace ALL possible base colors with the new base color
+                    for old_base_color in theme_color_map["base_colors"]:
+                        pattern = f'"{old_base_color}"'
+                        if pattern in updated_colors:
+                            updated_colors = updated_colors.replace(pattern, f'"{base_color}"')
+                            print(f"  Replaced base color {old_base_color} → {base_color}")
+                    
+                    # Replace ALL possible highlight colors with the new highlight color
+                    for old_highlight_color in theme_color_map["highlight_colors"]:
+                        pattern = f'"{old_highlight_color}"'
+                        if pattern in updated_colors:
+                            updated_colors = updated_colors.replace(pattern, f'"{highlight_color}"')
+                            print(f"  Replaced highlight color {old_highlight_color} → {highlight_color}")
+                    
+                    # Check if any changes were made
+                    if updated_colors != old_colors_str:
+                        new_marker_array = f'"color": [{updated_colors}]'
+                        html_content = re.sub(marker_color_pattern, new_marker_array, html_content, flags=re.DOTALL)
+                        modified = True
+                        print(f"Updated elbow plot marker colors: base='{base_color}', highlight='{highlight_color}'")
+                    else:
+                        print(f"No matching colors found to replace in elbow plot")
+        
+        # Write the modified content back to the file
+        if modified:
+            with open(html_file_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            print(f"SUCCESS: Applied {'continuous' if is_continuous_plot else 'discrete'} color changes")
+            return True
+        else:
+            print(f"No modifications were made to {html_file_path}")
+            return False
+            
+    except Exception as e:
+        print(f"Error modifying HTML file {html_file_path}: {e}")
+        return False
+
+def modify_plotly_html_colors(html_file_path: str, new_colors: list, file_uuid: str) -> bool:
+    """
+    Modify colors in an existing Plotly HTML file by using UUID-based div identification.
+    Much simpler and more reliable than regex parsing.
+    
+    Parameters:
+    - html_file_path: Path to the HTML file to modify  
+    - new_colors: List of new colors to apply
+    - file_uuid: UUID to identify the specific plot div
+    
+    Returns:
+    - bool: True if successful, False otherwise
+    """
+    try:
+        # Read the HTML file
+        with open(html_file_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        # Focus on replacing color_discrete_sequence arrays - more reliable than individual color replacement
+        import re
+        modified = False
+        
+        # Try to replace any color_discrete_sequence array directly
+        color_sequence_pattern = r'"color_discrete_sequence":\s*\[(.*?)\]'
+        match = re.search(color_sequence_pattern, html_content)
+        
+        if match:
+            # Build new color sequence
+            new_sequence = ', '.join([f'"{color}"' for color in new_colors])
+            new_color_array = f'"color_discrete_sequence": [{new_sequence}]'
+            html_content = re.sub(color_sequence_pattern, new_color_array, html_content)
+            modified = True
+            print(f"Updated color_discrete_sequence with new colors: {new_colors}")
+        
+        # For continuous color scales (PCA/UMAP plots), handle differently
+        # Replace actual viridis patterns found in Plotly HTML files
+        continuous_palette_applied = False
+        if not modified and len(new_colors) > 0 and isinstance(new_colors[0], str):
+            new_palette = new_colors[0].lower()  # e.g., "turbo"
+            new_palette_cap = new_colors[0].capitalize()  # e.g., "Turbo"
+            
+            # Replace the different viridis patterns with the new palette
+            replacements_made = 0
+            
+            # Pattern 1: colorscaleDflt:"Viridis" -> colorscaleDflt:"Turbo"
+            if 'colorscaleDflt:"Viridis"' in html_content:
+                html_content = html_content.replace('colorscaleDflt:"Viridis"', f'colorscaleDflt:"{new_palette_cap}"')
+                replacements_made += 1
+                print(f"Replaced colorscaleDflt: Viridis -> {new_palette_cap}")
+            
+            # Pattern 2: colorscaleDflt:"viridis" -> colorscaleDflt:"turbo" (lowercase)  
+            if 'colorscaleDflt:"viridis"' in html_content:
+                html_content = html_content.replace('colorscaleDflt:"viridis"', f'colorscaleDflt:"{new_palette}"')
+                replacements_made += 1
+                print(f"Replaced colorscaleDflt: viridis -> {new_palette}")
+            
+            # Pattern 3: Replace any standalone "viridis" with new palette in colorscale contexts
+            # Use word boundaries to avoid replacing parts of other words
+            viridis_pattern = r'\bviridis\b'
+            viridis_matches = len(re.findall(viridis_pattern, html_content, re.IGNORECASE))
+            if viridis_matches > 0:
+                html_content = re.sub(r'\bViridis\b', new_palette_cap, html_content)
+                html_content = re.sub(r'\bviridis\b', new_palette, html_content) 
+                replacements_made += viridis_matches
+                print(f"Replaced {viridis_matches} instances of viridis/Viridis with {new_palette}/{new_palette_cap}")
+            
+            if replacements_made > 0:
+                continuous_palette_applied = True
+                modified = True
+                print(f"Successfully applied continuous palette: {new_colors[0]} ({replacements_made} replacements)")
+        
+        # For plots with continuous palettes, also replace discrete hex colors if they exist
+        # This handles mixed plots that have both continuous scales and discrete color elements
+        if continuous_palette_applied and len(new_colors) > 1:
+            print(f"Also replacing discrete hex colors with theme colors: {new_colors[1:]}")
+            hex_color_pattern = r'"(#[0-9a-fA-F]{6})"'
+            hex_matches = re.findall(hex_color_pattern, html_content)
+            
+            if hex_matches:
+                print(f"Found hex colors to replace: {hex_matches[:5]}")
+                # Use colors starting from index 1 (skip the palette name at index 0)
+                discrete_colors_to_use = new_colors[1:]
+                
+                for i, new_color in enumerate(discrete_colors_to_use):
+                    if i < len(hex_matches):
+                        old_color = hex_matches[i]
+                        search_pattern = f'"{old_color}"'
+                        replacement = f'"{new_color}"'
+                        
+                        count_before = html_content.count(search_pattern)
+                        if count_before > 0:
+                            html_content = html_content.replace(search_pattern, replacement)
+                            print(f"Replaced discrete hex color {old_color} -> {new_color}")
+                            modified = True
+        
+        # If no continuous scale was found, fall back to standard discrete color replacement
+        elif not modified:
+            hex_color_pattern = r'"(#[0-9a-fA-F]{6})"'
+            hex_matches = re.findall(hex_color_pattern, html_content)
+            
+            if hex_matches:
+                print(f"Found hex colors: {hex_matches[:5]}")  # Show first 5
+                print(f"Number of new colors available: {len(new_colors)}")
+                print(f"New colors: {new_colors}")
+                
+                # Replace only the first N colors with available theme colors
+                for i, new_color in enumerate(new_colors):
+                    if i < len(hex_matches):
+                        old_color = hex_matches[i]
+                        search_pattern = f'"{old_color}"'
+                        replacement = f'"{new_color}"'
+                        
+                        print(f"DEBUG: Looking for pattern: {search_pattern}")
+                        print(f"DEBUG: Will replace with: {replacement}")
+                        
+                        # Count how many times this pattern appears
+                        count_before = html_content.count(search_pattern)
+                        print(f"DEBUG: Pattern appears {count_before} times in file")
+                        
+                        if count_before > 0:
+                            html_content = html_content.replace(search_pattern, replacement)  # Replace ALL occurrences, not just 1
+                            count_after = html_content.count(search_pattern)
+                            print(f"DEBUG: Pattern now appears {count_after} times (should be 0 after replacing all {count_before} instances)")
+                            
+                            # Verify the replacement actually happened
+                            replacement_count = html_content.count(replacement)
+                            print(f"DEBUG: New color appears {replacement_count} times in file")
+                            
+                            modified = True
+                            print(f"SUCCESS: Replaced {old_color} with {new_color}")
+                        else:
+                            print(f"WARNING: Pattern {search_pattern} not found in file!")
+                            # Show a sample of the file content around where we'd expect colors
+                            sample = html_content[:1000]
+                            print(f"DEBUG: File sample: {sample}")
+                    else:
+                        break
+                    
+        # Last resort: look for specific plotly color properties
+        if not modified:
+            color_properties = ['fillcolor', 'marker', 'line']
+            for prop in color_properties:
+                prop_pattern = f'"{prop}".*?"(#[0-9a-fA-F]{{6}})"'
+                if re.search(prop_pattern, html_content) and new_colors:
+                    html_content = re.sub(prop_pattern, f'"{prop}":"{new_colors[0]}"', html_content, count=1)
+                    modified = True
+                    print(f"Updated {prop} color to {new_colors[0]}")
+                    break
+        
+        if not modified:
+            print(f"No colors found to modify in {html_file_path}")
+            return False
+        
+        # Validate HTML content before writing
+        if len(html_content) < 100:  # HTML should be much longer
+            print(f"ERROR: HTML content too short ({len(html_content)} chars), not writing to avoid corruption")
+            return False
+            
+        if '<html' not in html_content.lower():
+            print(f"ERROR: HTML content doesn't appear to be valid HTML, not writing")
+            return False
+        
+        # Create backup before modifying
+        backup_path = html_file_path + '.backup'
+        try:
+            with open(html_file_path, 'r', encoding='utf-8') as f:
+                backup_content = f.read()
+            with open(backup_path, 'w', encoding='utf-8') as f:
+                f.write(backup_content)
+        except Exception as e:
+            print(f"Warning: Could not create backup: {e}")
+        
+        # Write back to file with extensive debugging
+        try:
+            print(f"DEBUG: About to write {len(html_content)} characters to {html_file_path}")
+            
+            # Check if file is writable
+            if not os.access(os.path.dirname(html_file_path), os.W_OK):
+                print(f"ERROR: No write permission to directory {os.path.dirname(html_file_path)}")
+                return False
+            
+            with open(html_file_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+                f.flush()  # Force write to disk
+                os.fsync(f.fileno())  # Force OS to write to disk
+                
+            print(f"DEBUG: File written, now verifying...")
+                
+            # Verify the file was written correctly
+            with open(html_file_path, 'r', encoding='utf-8') as f:
+                verify_content = f.read()
+                
+            print(f"DEBUG: Original content length: {len(html_content)}")
+            print(f"DEBUG: Verified content length: {len(verify_content)}")
+            
+            if len(verify_content) != len(html_content):
+                print(f"ERROR: File write verification failed for {html_file_path}")
+                print(f"ERROR: Length mismatch - wrote {len(html_content)} but read {len(verify_content)}")
+                return False
+                
+            # Check if colors actually changed by looking for one of the new colors
+            if new_colors and new_colors[0] in verify_content:
+                print(f"SUCCESS: New color {new_colors[0]} found in written file")
+                # CRITICAL: Also check if old colors are gone
+                old_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
+                old_colors_still_present = [color for color in old_colors if f'"{color}"' in verify_content]
+                if old_colors_still_present:
+                    print(f"CRITICAL ERROR: Old colors still present in file: {old_colors_still_present}")
+                    print(f"This means the modification didn't actually work!")
+                    return False
+                else:
+                    print(f"CONFIRMED: Old colors successfully removed from file")
+            else:
+                print(f"CRITICAL ERROR: New color {new_colors[0] if new_colors else 'N/A'} NOT found in written file")
+                print(f"First 500 chars of written file: {verify_content[:500]}")
+                return False
+                
+            print(f"Successfully modified and verified colors in {html_file_path}")
+            
+            # Clean up backup
+            if os.path.exists(backup_path):
+                os.remove(backup_path)
+                
+            return True
+            
+        except Exception as e:
+            print(f"ERROR: Failed to write HTML file {html_file_path}: {e}")
+            # Restore from backup if it exists
+            if os.path.exists(backup_path):
+                try:
+                    with open(backup_path, 'r', encoding='utf-8') as f:
+                        backup_content = f.read()
+                    with open(html_file_path, 'w', encoding='utf-8') as f:
+                        f.write(backup_content)
+                    print(f"Restored {html_file_path} from backup after error")
+                except Exception as restore_error:
+                    print(f"ERROR: Could not restore backup: {restore_error}")
+            return False
+        
+    except Exception as e:
+        print(f"Error modifying HTML colors in {html_file_path}: {e}")
+        return False
+
+@app.post("/regenerate_plots/{file_uuid}/", tags=["🎨 Theme Management"], summary="Regenerate Plots with Current Theme")
+async def regenerate_plots(file_uuid: str):
+    """
+    **Regenerate all existing plots for a dataset with the current theme.**
+    
+    This endpoint regenerates QC plots, preprocessing plots, and other visualizations
+    using the currently active theme. Useful after changing themes to update existing plots.
+    
+    **Parameters:**
+    - **file_uuid**: str - UUID of the dataset to regenerate plots for
+    
+    **Returns:**
+    ```json
+    {
+        "message": "Plots regenerated successfully",
+        "regenerated_plots": ["qc_plots"],
+        "theme_applied": "dark"
+    }
+    ```
+    """
+    try:
+        # Check if file exists
+        dir_path = os.path.join(UPLOAD_FOLDER, file_uuid)
+        file_path = os.path.join(dir_path, f"{file_uuid}.h5ad")
+        
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Dataset not found")
+        
+        regenerated_plots = []
+        current_theme = theme_manager.get_theme()  # Use the correct method
+        
+        # Get current theme colors for different plot types
+        violin_colors = current_theme.plot_types.get("violin_plots", {}).get("colors", ["#1f77b4", "#ff7f0e", "#2ca02c"])
+        scatter_colors = current_theme.plot_types.get("scatter_plots", {}).get("colors", ["#e91e63", "#9c27b0", "#673ab7", "#3f51b5", "#2196f3"])
+        
+        # For PCA and UMAP, get both continuous palette names AND discrete colors
+        pca_palette = current_theme.plot_types.get("pca_plots", {}).get("continuous_palette", "viridis")
+        umap_palette = current_theme.plot_types.get("umap_plots", {}).get("continuous_palette", "viridis")
+        umap_discrete_colors = current_theme.plot_types.get("umap_plots", {}).get("colors", ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"])
+        
+        # Get elbow plot colors
+        elbow_config = current_theme.plot_types.get("elbow_plots", {})
+        elbow_colors = [
+            elbow_config.get("base_color", "DarkGreen"),
+            elbow_config.get("highlight_color", "red")
+        ]
+        
+        # Modify existing plots in qc_plots, preprocess, and embedding directories
+        plot_directories = [
+            ("qc_plots", os.path.join(dir_path, "qc_plots")),
+            ("preprocess", os.path.join(dir_path, "preprocess")),
+            ("embedding", os.path.join(dir_path, "embedding"))
+        ]
+        
+        for dir_name, plots_dir in plot_directories:
+            if os.path.exists(plots_dir):
+                print(f"DEBUG: Found {dir_name} directory: {plots_dir}")
+                files_in_dir = os.listdir(plots_dir)
+                print(f"DEBUG: Files in {dir_name} directory: {files_in_dir}")
+                
+                modified_count = 0
+                
+                # Find all HTML plot files (violin, scatter, PCA, and UMAP plots)
+                # Detect violin plots more broadly (QC files are named like 'violin_plot_qc_metrics.html')
+                violin_files = [f for f in files_in_dir if f.endswith('.html') and 'violin' in f.lower()]
+                pca_files = [f for f in files_in_dir if f.startswith('pca_') and f.endswith('.html')]
+                umap_files = [f for f in files_in_dir if f.startswith('umap_') and f.endswith('.html')]
+                scatter_files = [
+                    f for f in files_in_dir
+                    if f.endswith('.html')
+                    and 'violin' not in f.lower()
+                    and not f.endswith('.out') and not f.endswith('.err')
+                    and f not in pca_files and f not in umap_files
+                ]
+                
+                print(f"DEBUG: All files in directory: {files_in_dir}")
+                print(f"DEBUG: Files ending with .html: {[f for f in files_in_dir if f.endswith('.html')]}")
+                all_plot_files = violin_files + scatter_files + pca_files + umap_files
+                print(f"DEBUG: Violin HTML files found: {violin_files}")
+                print(f"DEBUG: Scatter HTML files found: {scatter_files}")
+                print(f"DEBUG: PCA HTML files found: {pca_files}")
+                print(f"DEBUG: UMAP HTML files found: {umap_files}")
+                print(f"DEBUG: All plot files to modify: {all_plot_files}")
+                
+                for filename in all_plot_files:
+                    html_file_path = os.path.join(plots_dir, filename)
+                    abs_path = os.path.abspath(html_file_path)
+                    print(f"DEBUG: Attempting to modify: {html_file_path}")
+                    print(f"DEBUG: Absolute path: {abs_path}")
+                    print(f"DEBUG: File exists: {os.path.exists(abs_path)}")
+                    print(f"DEBUG: File size before: {os.path.getsize(abs_path) if os.path.exists(abs_path) else 'N/A'}")
+                    
+                    # Determine plot type based on filename
+                    if filename in violin_files:
+                        file_type = "violin"
+                        colors_to_use = violin_colors
+                    elif filename == "pca_elbow_plot.html":
+                        file_type = "elbow"
+                        colors_to_use = elbow_colors
+                    elif filename in pca_files:
+                        file_type = "pca"
+                        # For PCA plots: pass both palette name and backup discrete colors
+                        pca_discrete_colors = current_theme.plot_types.get("violin_plots", {}).get("colors", ["#1f77b4", "#ff7f0e", "#2ca02c"])
+                        colors_to_use = [pca_palette] + pca_discrete_colors[:10]  # Palette name first, then discrete colors
+                    elif filename in umap_files:
+                        file_type = "umap"
+                        # For UMAP plots: intelligently handle discrete vs continuous
+                        if "leiden" in filename.lower():
+                            # Discrete UMAP plot (clusters) - use robust discrete palette injection
+                            colors_to_use = ["DISCRETE_PALETTE"] + umap_discrete_colors  # Use discrete injection approach
+                        else:
+                            # Continuous UMAP plot (gene expression, mito, etc.) - use same strategy as PCA plots
+                            umap_backup_colors = current_theme.plot_types.get("violin_plots", {}).get("colors", ["#1f77b4", "#ff7f0e", "#2ca02c"])
+                            colors_to_use = [umap_palette] + umap_backup_colors[:10]  # Same continuous injection as PCA
+                    else:
+                        file_type = "scatter"
+                        colors_to_use = scatter_colors
+                    
+                    print(f"DEBUG: Processing {file_type} plot: {filename}")
+                    print(f"DEBUG: Using {file_type} colors: {colors_to_use[:3]}...")
+                    
+                    # Modify colors directly in HTML file
+                    if modify_plotly_html_colors_new(html_file_path, colors_to_use, file_uuid):
+                        modified_count += 1
+                        print(f"Successfully modified colors in {filename}")
+                    else:
+                        print(f"Failed to modify colors in {filename}")
+                
+                if modified_count > 0:
+                    regenerated_plots.append(dir_name)
+                    print(f"Modified {modified_count} plots in {dir_name} with theme: {current_theme.theme_name}")
+                else:
+                    print(f"No plots were successfully modified in {dir_name}")
+            else:
+                print(f"DEBUG: Directory does not exist: {plots_dir}")
+        
+        return {
+            "message": "Plots regenerated successfully" if regenerated_plots else "No plots found to regenerate",
+            "regenerated_plots": regenerated_plots,
+            "theme_applied": theme_manager.current_theme,
+            "file_uuid": file_uuid,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to regenerate plots: {str(e)}")
+
+
+@app.get("/themes/{theme_name}/preview/", tags=["🎨 Theme Management"], summary="Preview Theme")
+async def preview_theme(theme_name: str):
+    """
+    **Generate a preview visualization of a theme.**
+    
+    Creates sample plots demonstrating how the theme will look,
+    including color palettes, fonts, and layout settings.
+    
+    **Parameters:**
+    - **theme_name**: str - Name of theme to preview
+    
+    **Returns:**
+    HTML preview plots and color swatches for theme evaluation.
+    """
+    try:
+        if theme_name not in theme_manager.list_themes():
+            raise HTTPException(status_code=404, detail=f"Theme '{theme_name}' not found")
+        
+        theme = theme_manager.get_theme(theme_name)
+        preview = create_theme_preview(theme)
+        
+        # Get color palette from theme structure
+        color_palette = []
+        if hasattr(theme, 'plot_types') and 'violin_plots' in theme.plot_types:
+            color_palette = theme.plot_types['violin_plots'].get('colors', ['#1f77b4', '#ff7f0e', '#2ca02c'])
+        elif hasattr(theme, 'colors') and 'primary_palette' in theme.colors:
+            color_palette = theme.colors['primary_palette']
+        else:
+            color_palette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
+            
+        font_family = theme.global_settings.get('font_family', 'Arial, sans-serif') if hasattr(theme, 'global_settings') else 'Arial, sans-serif'
+
+        return {
+            "theme_name": theme_name,
+            "preview": preview,
+            "color_palette": color_palette,
+            "font_family": font_family
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate preview: {str(e)}")
+
+
+@app.get("/themes/plot-types/", tags=["🎨 Theme Management"], summary="Get All Plot Type Configurations")
+async def get_plot_type_configurations():
+    """
+    Get configuration options for all plot types in the current theme.
+    
+    Returns detailed settings for each plot type including colors, sizes, templates, etc.
+    """
+    try:
+        current_theme = get_current_theme()
+        plot_configs = {}
+        
+        for plot_type in current_theme.list_plot_types():
+            config = current_theme.get_plot_config(plot_type)
+            plot_configs[plot_type] = config
+            
+        return {
+            "current_theme": current_theme.theme_name,
+            "plot_types": plot_configs,
+            "available_plot_types": current_theme.list_plot_types()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get plot configurations: {str(e)}")
+
+
+@app.put("/themes/plot-types/{plot_type}/", tags=["🎨 Theme Management"], summary="Update Plot Type Configuration")
+async def update_plot_type_configuration(plot_type: str, config_update: dict):
+    """
+    Update configuration for a specific plot type.
+    
+    Allows granular customization of individual plot types within the current theme.
+    
+    **Parameters:**
+    - plot_type: The type of plot to update (violin_plots, scatter_plots, umap_plots, etc.)
+    - config_update: Dictionary with configuration updates
+    
+    **Example Request:**
+    ```json
+    {
+        "colors": ["#ff0000", "#00ff00", "#0000ff"],
+        "marker_size": 6,
+        "opacity": 0.8
+    }
+    ```
+    """
+    try:
+        current_theme = get_current_theme()
+        
+        # Check if current theme is valid
+        if not current_theme:
+            raise HTTPException(
+                status_code=500, 
+                detail="No current theme is set. Please set a theme first using /themes/current/{theme_name}/"
+            )
+        
+        # Get available plot types for debugging
+        try:
+            available_types = current_theme.list_plot_types()
+            if not available_types:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Current theme '{getattr(current_theme, 'theme_name', 'unknown')}' has no plot types configured"
+                )
+        except Exception as list_error:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error listing plot types from theme: {str(list_error)}"
+            )
+        
+        # Validate plot type
+        if plot_type not in available_types:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Plot type '{plot_type}' not found. Available types: {available_types}"
+            )
+        
+        # Update the plot type configuration
+        try:
+            current_theme.update_plot_config(plot_type, config_update)
+        except Exception as update_error:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error updating plot configuration: {str(update_error)}"
+            )
+        
+        # Get updated configuration
+        updated_config = current_theme.get_plot_config(plot_type)
+        
+        return {
+            "message": f"Plot type '{plot_type}' updated successfully",
+            "plot_type": plot_type,
+            "updated_config": updated_config
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update plot configuration: {str(e)}")
+
+
+@app.get("/themes/plot-types/{plot_type}/", tags=["🎨 Theme Management"], summary="Get Specific Plot Type Configuration")
+async def get_plot_type_configuration(plot_type: str):
+    """
+    Get configuration for a specific plot type.
+    
+    Returns all customizable settings for the specified plot type.
+    """
+    try:
+        current_theme = get_current_theme()
+        
+        # Validate plot type
+        if plot_type not in current_theme.list_plot_types():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Plot type '{plot_type}' not found. Available types: {current_theme.list_plot_types()}"
+            )
+        
+        config = current_theme.get_plot_config(plot_type)
+        
+        return {
+            "plot_type": plot_type,
+            "configuration": config,
+            "theme_name": current_theme.theme_name
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get plot configuration: {str(e)}")
+
+
+def _get_theme_description(theme_name: str) -> str:
+    """Get user-friendly description for a theme."""
+    descriptions = {
+        "default": "Clean scientific theme with professional blue palette",
+        "dark": "Dark mode theme for low-light environments",
+        "colorblind_friendly": "Accessible theme optimized for colorblind users",
+        "high_contrast": "High contrast theme for accessibility",
+        "publication": "Black and white theme perfect for scientific publications",
+        "vibrant": "Bright and colorful theme for presentations"
+    }
+    return descriptions.get(theme_name, "Custom user-defined theme")
+
+
+def _get_theme_category(theme_name: str) -> str:
+    """Get category for theme organization."""
+    categories = {
+        "default": "scientific",
+        "dark": "alternative",
+        "colorblind_friendly": "accessibility",
+        "high_contrast": "accessibility", 
+        "publication": "scientific",
+        "vibrant": "presentation"
+    }
+    return categories.get(theme_name, "custom")
+
+
+# ============================================================================
+# ENHANCED VISUALIZATION ENDPOINTS WITH THEME SUPPORT
+# ============================================================================
+
+@app.post("/genes_visualization_themed/", tags=["🎨 Step 5: Visualization"], summary="Gene Visualization with Theme Support")
+async def themed_genes_visualization(vis: VisualizationWithTheme):
+    """
+    **Create gene expression visualizations with custom theme support.**
+    
+    This enhanced version of gene visualization allows users to apply
+    custom themes for personalized color palettes, fonts, and layouts.
+    
+    **Request Body (VisualizationWithTheme):**
+    - Includes all standard visualization parameters
+    - Optional theme_name for predefined themes
+    - Optional custom_theme for on-the-fly customization
+    
+    **Theme Integration:**
+    - Uses specified theme for color mapping
+    - Applies custom fonts and layouts
+    - Supports accessibility options
+    - Maintains consistency across plots
+    
+    **Returns:**
+    Same format as standard gene visualization but with themed plots.
+    """
+    try:
+        # Set theme if specified
+        if vis.theme_name and vis.theme_name != "default":
+            if vis.theme_name not in theme_manager.list_themes():
+                raise HTTPException(status_code=400, detail=f"Theme '{vis.theme_name}' not found")
+            theme_manager.set_current_theme(vis.theme_name)
+        
+        # Handle custom theme
+        if vis.custom_theme:
+            custom_theme = PlotTheme(f"temp_{vis.file_uuid}")
+            if vis.custom_theme.colors:
+                custom_theme.colors.update(vis.custom_theme.colors.dict())
+            if vis.custom_theme.fonts:
+                custom_theme.fonts.update(vis.custom_theme.fonts.dict())
+            # Add other custom theme properties...
+            
+            theme_manager.add_custom_theme(custom_theme)
+            theme_manager.set_current_theme(custom_theme.theme_name)
+        
+        # Use existing visualization logic with theme support
+        from utils import genes_visualization_themed
+        
+        dir_path = os.path.join(UPLOAD_FOLDER, vis.file_uuid)
+        file_path = os.path.join(dir_path, f"{vis.file_uuid}.h5ad")
+        
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Analysis file not found")
+        
+        genes_plots_directory = os.path.join(dir_path, "visualization")
+        os.makedirs(genes_plots_directory, exist_ok=True)
+        
+        # Generate themed plots
+        plot_paths = genes_visualization_themed(
+            file_path, 
+            genes_plots_directory, 
+            vis.dim_red, 
+            vis.gene_list,
+            theme_name=vis.theme_name or "default"
+        )
+        
+        return {
+            "gene_expression_plots": plot_paths,
+            "theme_applied": vis.theme_name or "default",
+            "genes_visualized": len(vis.gene_list)
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate themed visualization: {str(e)}")
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  
+    allow_credentials=True,
+    allow_methods=["*"], 
+    allow_headers=["*"],  
+)

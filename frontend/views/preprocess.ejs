@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>scExplorer</title>
+    <link rel="icon" href="/scexplorer/images/logo_sc_explorer_v1.ico" type="image/x-icon">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://unpkg.com/tabulator-tables/dist/css/tabulator.css" rel="stylesheet">
+    <link rel="stylesheet" href="/scexplorer/css/styles.css">
+    <link rel="stylesheet" href="/scexplorer/css/theme-popup.css" />
+    <script type="text/javascript" src="https://unpkg.com/tabulator-tables/dist/js/tabulator.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.js"></script>
+    <script src="/scexplorer/js/help-enhancements.js"></script>
+    <script src="/config.js"></script>
+    <script src="/scexplorer/js/api-base.js"></script>
+</head>
+<body>
+    <aside class="sidebar">
+        <img src="/scexplorer/images/logo_sc_explorer_v1.png" alt="scExplorer logo" class="sidebar-logo">
+        <h1 class="sidebar-title">scExplorer</h1>
+        <ul>
+            <li><a href="/scexplorer/"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="/scexplorer/integration"><i class="fas fa-layer-group"></i>Integration</a></li>
+            <li><a href="/scexplorer/upload"><span class="step-number">0</span> <i class="fas fa-upload"></i> Upload</a></li>
+            <li><a href="/scexplorer/preprocess"><span class="step-number">1</span> <i class="fas fa-cogs"></i> Preprocess</a></li>
+            <li><a href="/scexplorer/embedding"><span class="step-number">2</span> <i class="fas fa-vector-square"></i> Embedding</a></li>
+            <li><a href="/scexplorer/dea"><span class="step-number">3</span> <i class="fas fa-chart-bar"></i> DEA</a></li>
+            <li><a href="/scexplorer/visualization"><span class="step-number">4</span> <i class="fas fa-chart-area"></i> Visualization</a></li>
+            <li><a href="/scexplorer/heatmap"><span class="step-number">5</span> <i class="fas fa-th"></i> Heatmap</a></li>
+            <li><a href="/scexplorer/results"><span class="step-number">6</span> <i class="fas fa-poll"></i> Results</a></li>
+        </ul>
+        <div class="sidebar-divider"></div>
+        <ul class="documentation-section">
+            <li><a id="api-docs-link" href="https://apps.cienciavida.org/backend/docs" target="_blank"><i class="fas fa-book"></i> API Documentation</a></li>
+        </ul>
+        <div class="resizer"></div>
+        <i id="toggleSidebarBtn" class="fas fa-angle-double-left white-icon" onclick="toggleSidebar()"></i>
+    </aside>
+    <button id="showSidebarBtn" class="show-sidebar-btn" onclick="toggleSidebar()"><i class="fas fa-angle-double-right"></i></button>
+
+    <section>
+        <div class="header-buttons">
+            <button onclick="openHelpModal()">Help</button>
+        </div>
+        <h2><i class="fas fa-cogs"></i> Preprocessing</h2>
+        <div id="analysisInfoBox"></div>
+        
+
+        <div class="category-box">
+            <h3>Quality Control Metric</h3>
+            <div class="plots-container"></div>
+        </div>
+
+        <div id="loadingOverlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:100;">
+            <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);">
+                <div style="color:white; font-size:20px; text-align:center;">
+                    <p>Preprocessing...</p>
+                    <img src="/scexplorer/images/loading3.svg" alt="Loading..." style="display:block; margin:auto;">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="embeding-box">
+        <h3>Preprocessing Parameters</h3>
+        <div class="row">
+            <div class="column third">
+                <div class="input-group">
+                    <label for="min_genes">Min Genes:
+                        <i class="fas fa-info-circle" style="color:#000000; cursor: pointer;">
+                            <span class="tooltip">Set the minimum amount of genes expressed in a cell for filtering.</span>
+                        </i>
+                    </label>
+                    <input type="number" id="min_genes" name="min_genes" value="200" required>
+                </div>
+            </div>
+            <div class="column third">
+                <div class="input-group">
+                    <label for="min_cells">Min Cells:
+                        <i class="fas fa-info-circle" style="color:#000000; cursor: pointer;">
+                            <span class="tooltip">Set the minimum amount of cells expressing a gene for filtering.</span>
+                        </i>
+                    </label>
+                    <input type="number" id="min_cells" name="min_cells" value="3" required>
+                </div>
+            </div>
+            <div class="column third">
+                <div class="input-group">
+                    <label for="mito_threshold">MT Threshold (%):
+                        <i class="fas fa-info-circle" style="color:#000000; cursor: pointer;">
+                            <span class="tooltip">Set the % of mitochondrial genes expressed per cell for filtering.</span>
+                        </i>
+                    </label>
+                    <input type="number" id="mito_threshold" name="mito_threshold" value="5" required>
+                </div>
+            </div>
+            <div class="column third">
+                <div class="input-group">
+                    <label for="doublet_detection">Doublet Detection:
+                        <i class="fas fa-info-circle" style="color:#000000; cursor: pointer;">
+                            <span class="tooltip">Enable or disable doublet detection.</span>
+                        </i>
+                    </label>
+                    <select id="doublet_detection" name="doublet_detection">
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                    </select>
+                </div>
+            </div>
+            <div class="upload-btn">
+                <button id="startPreprocess">Run</button>
+            </div>
+        </div>
+    </div>
+    <div id="exampleModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Select an Example File</h2>
+            <select id="modalExampleFile" name="exampleFile" onchange="updateDescription()">
+                <option value="example_human">Human PBMC</option>
+                <option value="example_mouse">Mouse cortex, hippocampus and subventricular zone cells </option>
+                <option value="example_zebrafish">Zebrafish cranial neural crest derived cells </option>
+            </select>
+            <p id="datasetDescription" style="padding: 15px; background-color: #f2f2f2; border-radius: 8px;"></p>
+            <button onclick="setExample()">Set Example</button>
+        </div>
+    </div>
+    <div id="helpModal" class="modal_help">
+        <div class="modal_help-content">
+            <div class="modal_help-header">
+                <span class="close" onclick="closeHelpModal()">&times;</span>
+                <h2>Preprocess Help</h2>
+            </div>
+
+            <div class="modal_help-body">
+                <div class="help-section">
+                <p>
+                    At the top of the preprocessing section, you will find two summary tables: the 
+                    <strong>Cell-level Observations</strong> table (1) and the <strong>Gene-level Observations</strong> table (2). 
+                    These tables contain the first quality metrics generated right after uploading your data. 
+                    As you move forward through the pipeline, new information will automatically be added to these tables.
+                </p>
+                    
+                    <img src="/scexplorer/images/preprocesing_1.png" alt="Preprocess Tutorial Image" />
+
+                <p>
+                    For the <strong>Cell-level Observations</strong> table, you will see details such as the unique identity of each cell (1), 
+                    the number of genes detected per cell, the total counts, and other relevant metrics. 
+                    As the workflow progresses, any new cell-level metrics will be stored here. 
+                    This table can also be downloaded (2), and you can return to the pipeline view at any time by clicking the close button (3).
+                </p>
+                    <img src="/scexplorer/images/cell_observations.png" alt="Preprocess Tutorial Image" />
+
+                <p>
+                    For the <strong>Gene-level Observations</strong> table, you will find the gene ID (1), 
+                    the total counts per gene, and whether a gene is annotated as mitochondrial, ribosomal, or other categories. 
+                    As with the cell table, any new gene-level metrics produced during the workflow will be added here. 
+                    This table can also be downloaded (2), and you can return to the pipeline with the close button (3).
+                </p>
+
+                
+                    <img src="/scexplorer/images/gene_bservations.png" alt="Preprocess Tutorial Image" />
+
+                    <p>
+                        During preprocessing, you can filter your dataset according to four parameters:
+                    </p>
+                    <ul>
+                        <li><strong>Min Genes:</strong> (1) filters out low-quality cells with fewer than the indicated number of genes.</li>
+                        <li><strong>Min Cells:</strong> (2) filters out genes expressed in fewer than the indicated number of cells, keeping only biologically relevant genes.</li>
+                        <li><strong>Mitochondrial Threshold:</strong> (3) filters out cells whose mitochondrial percentage is above the indicated value.</li>
+                        <li><strong>Doublet Detection:</strong> (4)  enables the detection and removal of doublets that may have been generated during library preparation.</li>
+                    </ul>
+
+                    <p>
+                        For this tutorial, we will use the default parameters: 
+                        <em>200 Min Genes, 3 Min Cells, 5% Mitochondrial Threshold, and Doublet Detection enabled</em>. 
+                        Once you set these values, click on <strong>Run</strong> (5).
+                    </p>
+                    </div>
+
+                    <img src="/scexplorer/images/preprocesing_2.png" alt="Preprocess Tutorial Image" style="width:85%"/>
+
+
+                <!-- Optimal parameters info box -->
+                <div class="info-box">
+                    <strong>What parameters are optimal for preprocessing a single-cell dataset?</strong>
+                    <p>
+                        Preprocessing of single-cell data is a crucial step for accurate identification and characterization of cell types, states, and biological mechanisms. Thus, proper data preprocessing will improve downstream analysis.
+                    </p>
+                    
+                    <p>
+                        A good starting point to explore the preprocessing parameters is those recommended by Seurat and Scanpy developers such as 3 for Min Genes, 200 for Min Cells, and 5% for Mitochondrial Threshold. However, we encourage users to explore multiple parameters since the best will vary across datasets, species, platforms, etc.
+                    </p>
+                    
+                    <p>
+                        For instance, a systematic analysis determined that a mitochondrial threshold of 5% distinguishes high- and low-quality cells in mouse samples whereas in human failed to discriminate in one third of the datasets.
+                    </p>
+                    
+                    <p>
+                        Droplet-based single-cell methods generates doublets, which are two cells in one droplet. Thus, elimination of doublets is a key step during preprocessing since single-cell methods assumes that each droplet contains only one cell.
+                    </p>
+                </div>
+
+                <div class="help-section">
+                <p>
+                    After running preprocessing, scExplorer will generate six quality control (QC) plots that help you evaluate 
+                    whether the dataset is suitable for downstream analysis:
+                </p>
+                <ul>
+                    <li><strong>Box/Violin plots (top row):</strong> show the number of genes per cell, total counts, and the percentage of mitochondrial genes (1)(2)(3).</li>
+                    <li><strong>Scatter plots (bottom row):</strong> show the correlation between the number of genes and total counts, 
+                        the relationship between mitochondrial counts and total counts, and the variance of genes across cells (4)(5)(6).</li>
+                </ul>
+
+                    <img src="/scexplorer/images/preprocesing_3.png" alt="Preprocess Tutorial Image" />
+
+                </div>
+            </div>
+
+            <div class="help-modal-footer">
+                <button onclick="closeHelpModal()">Close</button>
+            </div>
+        </div>
+    </div>
+    <div class="preprocess-box" style="display: none;">
+        <div class="hidden-section" style="display: none;">
+            <div class="preprocessing-results">
+                <h3>Preprocessing Results</h3>
+                <div class="preprocessing-plots-container"></div>
+            </div>
+            <div class="preprocessing-plots-container"></div>
+        </div>
+    </div>
+
+    <!-- Centered Button Container -->
+    <div class="button-container-results" id="preprocessButtons" style="margin: 30px 200px; padding: 0; display: none;">
+        <div class="button-row" style="display: flex; justify-content: flex-end; align-items: center; gap: 20px; flex-wrap: wrap;">
+            <div class="upload-btn">
+                <button id="continueToEmbedding" style="padding: 8px 16px; font-size: 0.9rem; min-width: 160px; line-height: 1.2; display: flex; align-items: center; justify-content: center; height: 36px;">Continue to Embedding</button>
+            </div>
+            <div class="bottom-buttons" style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
+                <div id="exportOptions" style="display: none; position: relative; background: white; border: 1px solid #d1d5db; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); z-index: 10; margin-bottom: 8px; min-width: 200px;"></div>
+                <button id="exportData" class="custom-btn" style="padding: 8px 16px; font-size: 0.9rem; min-width: 100px; line-height: 1.2; display: flex; align-items: center; justify-content: center; height: 36px;">Export</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tableOverlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:100;">
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background-color: white; padding: 20px; border-radius: 10px; width: 90%; height: 90%; overflow: hidden;">
+            <div class="tabulator-container" style="height: 95%;"><!-- Updated: Container for table with overflow -->
+                <div id="example-table"></div>
+            </div>
+            <button onclick="hideTableOverlay()">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = window.API_BASE_URL || "/backend";
+       // const BASE_URL = window.API_BASE_URL; // Configurable server base URL
+        (function(){const l=document.getElementById('api-docs-link');if(l&&window.API_BASE_URL) l.href = `${window.API_BASE_URL}/docs`;})();
+
+        window.onload = function () {
+            displayInitialInfo();
+            loadInitialPlots();
+            addEventListeners();
+
+            const uuid = sessionStorage.getItem("uuid");
+            const analysisNameValue = sessionStorage.getItem("analysisName");
+            const preprocessPath = JSON.parse(sessionStorage.getItem("preprocess_path"));
+
+            if (uuid && preprocessPath) {
+                const hiddenSection = document.querySelector(".hidden-section");
+                const preprocess = document.querySelector(".preprocess-box");
+
+                hiddenSection.style.display = "block";
+                preprocess.style.display = "block";
+                showPreprocessButtons();
+
+                const container = document.querySelector(".preprocessing-plots-container");
+                container.innerHTML = "";  
+
+                let row;
+                preprocessPath.forEach((plotUrl, index) => {
+                    if (index % 3 === 0) {
+                        row = document.createElement("div");
+                        row.className = "preprocessing-result";
+                        container.appendChild(row);
+                    }
+                    displayPlot(plotUrl, ".preprocessing-result:last-child");
+                });
+            }
+        };
+
+        function displayInitialInfo() {
+            const uuid = sessionStorage.getItem("uuid");
+            const analysisNameValue = sessionStorage.getItem("analysisName");
+        
+            let cellObservationsPath = `${BASE_URL}/get_obs/uploads/${uuid}/${uuid}_obs.csv`;
+            let geneObservationsPath = `${BASE_URL}/get_var/uploads/${uuid}/${uuid}_var.csv`;
+        
+            document.getElementById("analysisInfoBox").innerHTML = `
+                Analysis Name: ${analysisNameValue}<br>
+                UUID: ${uuid} <i class="fas fa-copy" onclick="copyToClipboard('${uuid}')" style="cursor: pointer; font-size: 14px;"></i><br>
+                Cell Observations: <a href="#" onclick="showTableOverlay('${cellObservationsPath}')">View Data</a><br>
+                Gene Observations: <a href="#" onclick="showTableOverlay('${geneObservationsPath}')">View Data</a><br>
+
+            `;
+        }   
+        
+        /* ---------- Show preprocess buttons ---------- */
+        function showPreprocessButtons() {
+            document.getElementById('preprocessButtons').style.display = 'block';
+        }
+
+        function openHelpModal() {
+            document.getElementById('helpModal').style.display = 'block';
+        }
+    
+        function closeHelpModal() {
+            document.getElementById('helpModal').style.display = 'none';
+        }
+    
+        window.onclick = function(event) {
+            var modal = document.getElementById('helpModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(function () {
+            }, function (err) {
+                console.error('Could not copy text: ', err);
+            });
+        }
+
+        function loadInitialPlots() {
+            const plotsPath = JSON.parse(sessionStorage.getItem("plots_path"));
+
+            if (plotsPath && plotsPath.length > 0) {
+                plotsPath.forEach((plotUrl) => {
+                    displayPlot(plotUrl, ".plots-container");
+                });
+            }
+        }
+
+        function addEventListeners() {
+            document.getElementById("startPreprocess").addEventListener("click", startPreprocessing);
+        }
+
+        function displayPlot(plotUrl, containerSelector) {
+            const container = document.querySelector(containerSelector);
+            const column = document.createElement("div");
+            column.className = "column third";
+
+            const iframe = document.createElement("iframe");
+            const currentTime = new Date().getTime();
+            iframe.src = `${BASE_URL}/${plotUrl}`;
+            iframe.style.width = "100%";
+            iframe.style.height = "450px";
+            iframe.style.border = "none";
+            iframe.style.marginTop = "10px";
+            iframe.onload = function () {
+                const iframeDocument = iframe.contentDocument || iframe.contentWindow.document;
+                const img = iframeDocument.querySelector('img');
+                if (img) {
+                    img.style.maxWidth = '100%';
+                    img.style.maxHeight = '100%';
+                }
+            };
+            column.appendChild(iframe);
+            container.appendChild(column);
+        }
+        function setPipelineParameters() {
+            // Collect parameter values from the form
+            const parameters = {
+                min_genes: document.getElementById("min_genes")?.value,
+                min_cells: document.getElementById("min_cells")?.value,
+                mt_threshold: document.getElementById("mito_threshold")?.value,
+                doublet_detection: document.getElementById("doublet_detection")?.value,
+
+            };
+        
+            // Check for missing parameters
+            const missingFields = Object.keys(parameters).filter((key) => !parameters[key]);
+        
+            if (missingFields.length > 0) {
+                alert(`Please fill in the required fields: ${missingFields.join(", ")}`);
+                throw new Error(`Missing required parameters: ${missingFields.join(", ")}`);
+            }
+        
+            // Save parameters to sessionStorage
+            Object.keys(parameters).forEach((key) => {
+                sessionStorage.setItem(key, parameters[key]);
+            });
+        
+            console.log("Pipeline parameters set:", parameters); // Debugging log
+        }
+
+        function startPreprocessing() {
+        // Check if this has been run before in the session. If so, show a warning.
+        if (sessionStorage.getItem('preprocess_run_once') === 'true') {
+            if (!confirm("Warning: Re-running the preprocessing step will invalidate all subsequent analyses (Embedding, DEA, etc.). Are you sure you want to proceed?")) {
+                return; // Stop the function if the user cancels
+            }
+        }
+
+        const hiddenSection = document.querySelector(".hidden-section");
+        const preprocessBox = document.querySelector(".preprocess-box");
+        hiddenSection.style.display = "block";
+        preprocessBox.style.display = "block";
+        showPreprocessButtons();
+
+        const fileUUID = sessionStorage.getItem("uuid");
+        const mitoThresholdValue = document.getElementById("mito_threshold").value;
+        const minGenesValue = document.getElementById("min_genes").value;
+        const minCellsValue = document.getElementById("min_cells").value;
+        const doubletDetectionValue = document.getElementById("doublet_detection").value;
+        document.getElementById('loadingOverlay').style.display = 'block';
+        setPipelineParameters();
+
+        fetch(`${BASE_URL}/process/${fileUUID}/?min_genes=${minGenesValue}&min_cells=${minCellsValue}&mito_threshold=${mitoThresholdValue}&doublet_detection=${doubletDetectionValue}`)
+            .then((response) => response.json())
+            .then((data) => {
+            // On success, set a flag indicating this step has been run.
+            sessionStorage.setItem('preprocess_run_once', 'true');
+            // Clear the flags for downstream steps, as they are now invalid.
+            sessionStorage.removeItem('pca_run_once');
+            sessionStorage.removeItem('umap_run_once');
+
+            sessionStorage.setItem("preprocess_path", JSON.stringify(data.processing_plot_paths));
+            const container = document.querySelector(".preprocess-box .preprocessing-plots-container");
+            container.innerHTML = "";
+
+            if (data.processing_plot_paths && data.processing_plot_paths.length > 0) {
+                let row;
+                data.processing_plot_paths.forEach((plotUrl, index) => {
+                    if (index % 3 === 0) {
+                        row = document.createElement("div");
+                        row.className = "preprocessing-result";
+                        container.appendChild(row);
+                    }
+                    displayPlot(plotUrl, ".preprocessing-result:last-child");
+                });
+            }
+            document.getElementById('loadingOverlay').style.display = 'none';
+        })
+        .catch((error) => {
+            console.error("Error processing file:", error);
+            document.getElementById('loadingOverlay').style.display = 'none';
+        });
+        }
+
+
+
+
+        document.getElementById("continueToEmbedding").addEventListener("click", goToEmbedding);
+        document.getElementById("exportData").addEventListener("click", exportData);
+
+        function goToEmbedding() {
+            window.location.href = "/scexplorer/embedding";
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const sections = document.querySelectorAll('section, .content-section, .uuid-box, .category-box, .preprocess-box, .embeding-box, .button-container-results');
+            const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+            const showSidebarBtn = document.getElementById('showSidebarBtn');
+        
+            if (sidebar.classList.contains('hidden')) {
+                sidebar.classList.remove('hidden');
+                sections.forEach(section => {
+                    section.style.marginLeft = '250px';
+                    section.style.width = '85%';
+                });
+                toggleSidebarBtn.style.display = 'block';
+                showSidebarBtn.style.display = 'none';
+            } else {
+                sidebar.classList.add('hidden');
+                sections.forEach(section => {
+                    section.style.marginLeft = '150px';
+                    section.style.width = '80%';
+                });
+                toggleSidebarBtn.style.display = 'none';
+                showSidebarBtn.style.display = 'block';
+            }
+        }
+        
+        function showSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const sections = document.querySelectorAll('section, .content-section, .uuid-box, .category-box, .preprocess-box, .embeding-box, .button-container-results');
+            const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+            const showSidebarBtn = document.getElementById('showSidebarBtn');
+        
+            sidebar.classList.remove('hidden');
+            sections.forEach(section => {
+                section.style.marginLeft = '250px';
+                section.style.width = '80%';
+            });
+            toggleSidebarBtn.style.display = 'block';
+            showSidebarBtn.style.display = 'none';
+        }
+        
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const categoryBox = document.querySelector('.plots-container');
+
+            categoryBox.addEventListener('click', function () {
+                if (categoryBox.style.display === "none" || !categoryBox.style.display) {
+                    categoryBox.style.display = "block";
+                } else {
+                    categoryBox.style.display = "none";
+                }
+            });
+        });
+
+        document.getElementById('exportData').addEventListener('click', function () {
+            const exportOptions = document.getElementById('exportOptions');
+            exportOptions.style.display = exportOptions.style.display === 'none' ? 'block' : 'none';
+
+            exportOptions.innerHTML = '';
+
+            const options = [
+                { name: 'Export for Seurat', action: exportForSeurat },
+                { name: 'Export for Scanpy', action: exportForScanpy }
+            ];
+
+            const ul = document.createElement('ul');
+            ul.style.cssText = 'list-style: none; margin: 0; padding: 8px 0;';
+            options.forEach(opt => {
+                const li = document.createElement('li');
+                li.textContent = opt.name;
+                li.style.cssText = 'padding: 8px 16px; cursor: pointer; color: #374151; font-size: 0.9rem; border-bottom: 1px solid #f3f4f6;';
+                li.addEventListener('mouseenter', function() {
+                    this.style.backgroundColor = '#f9fafb';
+                });
+                li.addEventListener('mouseleave', function() {
+                    this.style.backgroundColor = 'transparent';
+                });
+                li.addEventListener('click', function () {
+                    opt.action();
+                    exportOptions.style.display = 'none'; 
+                });
+                ul.appendChild(li);
+            });
+
+            exportOptions.appendChild(ul);
+        });
+
+        function exportForSeurat() {
+            showLoadingOverlay('Exporting for Seurat...');
+
+            const uuid = sessionStorage.getItem("uuid");
+            if (!uuid) {
+                console.error("UUID not found in session storage.");
+                return;
+            }
+
+            const url = `${BASE_URL}/seurat_export?uuid=${uuid}`;
+            const options = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ uuid: uuid })
+            };
+
+            fetch(url, options)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to export file');
+                    hideLoadingOverlay();
+                    return response.blob();
+                })
+                .then(blob => {
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = `${uuid}.rds`; 
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(downloadUrl); 
+                })
+                .catch(error => {
+                    console.error("Error during file export:", error);
+                    hideLoadingOverlay();
+                });
+        }
+
+        function exportForScanpy() {
+            showLoadingOverlay('Exporting for Scanpy...');
+
+            const uuid = sessionStorage.getItem("uuid");
+            if (!uuid) {
+                console.error("UUID not found in session storage.");
+                return;
+            }
+
+            const url = `${BASE_URL}/scanpy_export?uuid=${uuid}`;
+            const options = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ uuid: uuid })
+            };
+
+            fetch(url, options)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to export file');
+
+                    return response.blob();
+                })
+                .then(blob => {
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = `${uuid}.h5ad`; 
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(downloadUrl); 
+                    hideLoadingOverlay();
+
+                })
+                .catch(error => {
+                    hideLoadingOverlay();
+
+                    console.error("Error during file export:", error);
+                    
+                });
+        }
+
+        function showLoadingOverlay(message) {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingText = document.querySelector('#loadingOverlay p');
+            loadingText.textContent = message;
+            loadingOverlay.style.display = 'block';
+        }
+
+        function hideLoadingOverlay() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        function showTableOverlay(csvPath) {
+            const tableOverlay = document.getElementById('tableOverlay');
+            const exampleTable = document.getElementById('example-table');
+        
+            tableOverlay.style.display = 'block';
+            fetchCSVData(csvPath)
+                .then(data => {
+                    displayTable(data);
+                })
+                .catch(error => {
+                    console.error("Error fetching or parsing CSV data:", error);
+                });
+        }
+
+        function hideTableOverlay() {
+            const tableOverlay = document.getElementById('tableOverlay');
+            tableOverlay.style.display = 'none';
+        }
+
+        function fetchCSVData(url) {
+            return fetch(url)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to fetch CSV data');
+                    return response.text();
+                })
+                .then(csvText => {
+                    return new Promise((resolve, reject) => {
+                        Papa.parse(csvText, {
+                            header: true,
+                            complete: results => {
+                                resolve(results.data);
+                            },
+                            error: error => {
+                                reject(error);
+                            }
+                        });
+                    });
+                });
+        }   
+
+        function displayTable(data) {
+            var table = new Tabulator("#example-table", {
+                data: data,
+                columns: generateColumns(data),
+                layout: "fitDataTable",
+                pagination: "local",
+                paginationSize: 14,
+                height: "100%",  // Fixed height for the table
+                movableColumns: true,  // Allow column movement
+                responsiveLayout: false,
+                tableBuilt: function() {
+                    // Ensure custom styles are applied
+                    document.querySelectorAll('.tabulator').forEach(function(element) {
+                        element.classList.add('tabulator');
+                    });
+                }
+            });
+        }
+        
+        function generateColumns(data) {
+            if (data.length === 0) return [];
+            
+            return Object.keys(data[0]).map(key => {
+                const column = {
+                    title: key,
+                    field: key,
+                    width: 160  // Ancho fijo para todas las columnas
+                };
+        
+                // Determinar si la columna contiene números
+                const isNumeric = data.some(row => {
+                    const value = row[key];
+                    return typeof value === 'number' || (typeof value === 'string' && !isNaN(parseFloat(value)));
+                });
+                
+                if (isNumeric) {
+                    column.formatter = threeDecimalFormatter;
+                } else {
+                    column.formatter = "plaintext";
+                }
+        
+                return column;
+            });
+        }
+        
+        function threeDecimalFormatter(cell, formatterParams, onRendered) {
+            let value = cell.getValue();
+            if (typeof value === 'number' || (typeof value === 'string' && !isNaN(parseFloat(value)))) {
+                return parseFloat(value).toFixed(3);
+            }
+            return value;
+        }
+        
+        
+        
+    </script>
+    
+    <!-- Theme Manager Script -->
+    <script src="/scexplorer/js/theme-manager-new.js"></script>
+</body>
+</html>

@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>scExplorer — Heatmap</title>
+  <link rel="icon" href="/scexplorer/images/logo_sc_explorer_v1.ico" type="image/x-icon">
+  <link rel="stylesheet" href="/scexplorer/css/styles.css" />
+  <link rel="stylesheet" href="/scexplorer/css/theme-popup.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <script src="/scexplorer/js/help-enhancements.js"></script>
+  <script src="/config.js"></script>
+  <script src="/scexplorer/js/api-base.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <img src="/scexplorer/images/logo_sc_explorer_v1.png" alt="scExplorer logo" class="sidebar-logo" />
+    <h1 class="sidebar-title">scExplorer</h1>
+    <ul>
+      <li><a href="/scexplorer/"><i class="fas fa-home"></i> Home</a></li>
+      <li><a href="/scexplorer/integration"><i class="fas fa-layer-group"></i>Integration</a></li>
+      <li><a href="/scexplorer/upload"><span class="step-number">0</span> <i class="fas fa-upload"></i> Upload</a></li>
+      <li><a href="/scexplorer/preprocess"><span class="step-number">1</span> <i class="fas fa-cogs"></i> Preprocess</a></li>
+      <li><a href="/scexplorer/embedding"><span class="step-number">2</span> <i class="fas fa-vector-square"></i> Embedding</a></li>
+      <li><a href="/scexplorer/dea"><span class="step-number">3</span> <i class="fas fa-chart-bar"></i> DEA</a></li>
+      <li><a href="/scexplorer/visualization"><span class="step-number">4</span> <i class="fas fa-chart-area"></i> Visualization</a></li>
+      <li><a href="/scexplorer/heatmap"><span class="step-number">5</span> <i class="fas fa-th"></i> Heatmap</a></li>
+      <li><a href="/scexplorer/results"><span class="step-number">6</span> <i class="fas fa-poll"></i> Results</a></li>
+    </ul>
+    <div class="sidebar-divider"></div>
+    <ul class="documentation-section">
+      <li><a id="api-docs-link" href="https://apps.cienciavida.org/backend/docs" target="_blank"><i class="fas fa-book"></i> API Documentation</a></li>
+    </ul>
+    <div class="resizer"></div>
+    <i id="toggleSidebarBtn" class="fas fa-angle-double-left white-icon" onclick="toggleSidebar()"></i>
+  </aside>
+  <button id="showSidebarBtn" class="show-sidebar-btn" onclick="toggleSidebar()"><i class="fas fa-angle-double-right"></i></button>
+
+  <main class="main-content">
+    <section>
+      <div class="header-buttons">
+        <button onclick="openHelpModal()">Help</button>
+      </div>
+      <h2><i class="fas fa-th"></i> Heatmap</h2>
+      <div id="analysisInfoBox"></div>
+    </section>
+    <!-- Loading overlay (consistent with other pages) -->
+    <div id="loadingOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:100;">
+      <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);">
+        <div style="color:white; font-size:20px; text-align:center;">
+          <p>Heatmap...</p>
+          <img src="/scexplorer/images/loading3.svg" alt="Loading..." style="display:block; margin:auto;"/>
+        </div>
+      </div>
+    </div>
+
+    <div class="embeding-box">
+      <h3>Heatmap Parameters</h3>
+      <div class="row" style="display: flex; align-items: flex-start;">
+        <div class="column third" style="flex: 1; margin-right: 20px;">
+          <h4 style="margin: 0 0 15px 0; color: #333; font-size: 1em;">Settings</h4>
+          <div class="input-group">
+            <label for="groupby">Group by (obs):</label>
+            <select id="groupby"></select>
+          </div>
+          <div class="input-group">
+            <label for="topN">Top N genes per group:</label>
+            <input type="number" id="topN" value="10" min="1" max="100" />
+          </div>
+        </div>
+        <div class="column third" style="flex: 1; margin-right: 20px;">
+          <h4 style="margin: 0 0 15px 0; color: #333; font-size: 1em;">Gene Selection</h4>
+          <div class="input-group">
+            <label for="geneSearch">Search Gene:</label>
+            <input type="text" id="geneSearch" placeholder="Type to filter genes" />
+          </div>
+          <div class="input-group">
+            <label for="genes">Select Genes (optional):</label>
+            <select id="genes" multiple size="6"></select>
+          </div>
+        </div>
+        <div class="column third" style="flex: 1;">
+          <h4 style="margin: 0 0 15px 0; color: #333; font-size: 1em;">Display Options</h4>
+          <div class="input-group" style="display:flex; align-items:center; gap:8px;">
+            <label style="flex:0 0 auto; min-width: 88px; margin:0;">Scaling:</label>
+            <div style="flex:1; display:flex; flex-wrap:nowrap; gap: 10px;">
+              <label style="display: inline-flex; align-items: center; white-space:nowrap;"><input type="checkbox" id="zscore" style="margin-right: 5px;" onchange="toggleColorRangeControls()" /> Z-score</label>
+              <label style="display: inline-flex; align-items: center; white-space:nowrap;"><input type="checkbox" id="standardScale" style="margin-right: 5px;" onchange="toggleColorRangeControls()" /> Standard scale</label>
+            </div>
+          </div>
+          <div class="input-group" id="colorRangeControls" style="display:none;">
+            <label for="vmin">Color range min (vmin):</label>
+            <input type="number" id="vmin" value="-3" step="0.1" />
+          </div>
+          <div class="input-group" id="colorRangeControls2" style="display:none;">
+            <label for="vmax">Color range max (vmax):</label>
+            <input type="number" id="vmax" value="3" step="0.1" />
+          </div>
+          <!-- removed preprocessing note per request -->
+          <div class="input-group" style="display:flex; align-items:flex-start; gap:8px;">
+            <label style="flex:0 0 auto; min-width: 88px; margin:8px 0 0 0;">Visualization:</label>
+            <div style="flex:1; display:flex; flex-direction:column; gap:8px;">
+              <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                <label style="display:inline-flex; align-items:center; white-space:nowrap;"><input type="checkbox" id="clusterRows" checked style="margin-right: 5px;" /> Cluster genes</label>
+                <label style="display:inline-flex; align-items:center; white-space:nowrap;"><input type="checkbox" id="useRaw" style="margin-right: 5px;" /> Use raw</label>
+              </div>
+              <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                <label style="display:inline-flex; align-items:center; white-space:nowrap;"><input type="checkbox" id="dendrogram" style="margin-right: 5px;" /> Show dendrogram</label>
+                <label style="display:inline-flex; align-items:center; white-space:nowrap;"><input type="checkbox" id="swapAxes" style="margin-right: 5px;" /> Swap axes</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Run button aligned bottom-right of the parameters container -->
+      <div class="control-btns" style="display:flex; justify-content:flex-end; margin-top: 16px;">
+        <button id="runHeatmap" class="primary-run-btn">Run</button>
+      </div>
+    </div>
+
+    <div id="HeatmapResults" class="embeding-box" style="display:none;">
+      <h3>Heatmap Results</h3>
+    <div id="heatmapInfo" style="margin-bottom:8px;"></div>
+      <img id="heatmapImage" alt="cell heatmap" style="width:100%; max-width:1200px; max-height:1600px; border:1px solid #ddd;" />
+    </div>
+
+    <!-- Centered Button Container -->
+    <div class="button-container-results" id="heatmapButtons" style="margin: 30px 200px; padding: 0; display: none;">
+        <div class="button-row" style="display: flex; justify-content: flex-end; align-items: center; gap: 20px; flex-wrap: wrap;">
+            <div class="upload-btn">
+                <button id="continueToResults" style="padding: 8px 16px; font-size: 0.9rem; min-width: 160px; line-height: 1.2; display: flex; align-items: center; justify-content: center; height: 36px;">Continue to Results</button>
+            </div>
+            <div class="bottom-buttons" style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
+                <div id="exportOptions" style="display: none; position: relative; background: white; border: 1px solid #d1d5db; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); z-index: 10; margin-bottom: 8px; min-width: 200px;"></div>
+                <button id="exportData" class="custom-btn" style="padding: 8px 16px; font-size: 0.9rem; min-width: 100px; line-height: 1.2; display: flex; align-items: center; justify-content: center; height: 36px;">Export</button>
+            </div>
+        </div>
+    </div>
+  </main>
+
+  <!-- Help Modal -->
+  <div id="helpModal" class="modal_help" style="display:none;">
+    <div class="modal_help-content">
+      <div class="modal_help-header">
+        <span class="close" onclick="closeHelpModal()">&times;</span>
+        <h2>Heatmap Help</h2>
+      </div>
+      <div class="modal_help-body">
+        Configure the heatmap plot using the numbered controls shown below, then run to visualize group-level patterns and marker genes.</p>
+
+        <img src="/scexplorer/images/heatmap.png" alt="Heatmap parameters" style="max-width:100%; border:1px solid #e5e7eb; border-radius:8px; margin:12px 0;" />
+
+        <p><strong>Parameters:</strong></p>
+        <ul>
+          <li><strong>(1) Group by (obs):</strong> Observation column to group cells (e.g., <code>leiden</code> or user labels). Defines category blocks.</li>
+          <li><strong>(2) Top N genes per group:</strong> If no manual genes are chosen, the top N per group are selected (from DEA/selection). Keep N reasonable for readability.</li>
+          <li><strong>(3) Search Gene:</strong> Filter the gene list to override automatic selection.</li>
+          <li><strong>(4) Scaling — Z‑score:</strong> Row-wise z-score per gene. When enabled you can optionally set <em>vmin</em>/<em>vmax</em> clip values for the color range.</li>
+          <li><strong>(5) Scaling — Standard scale:</strong> 0–1 scaling per gene. Avoid combining with z-score.</li>
+          <li><strong>(6) Cluster genes:</strong> Hierarchically cluster genes to group similar profiles.</li>
+          <li><strong>(7) Use raw:</strong> Plot raw counts instead of normalized values (generally off).</li>
+          <li><strong>(8) Show dendrogram:</strong> Display the clustering dendrogram for groups/genes when clustering is enabled.</li>
+          <li><strong>(9) Swap axes:</strong> Rotate layout (categories on x‑axis, genes on y‑axis) — Scanpy-style orientation.</li>
+        </ul>
+
+        <div class="help-section">
+            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%); border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 20px 0; position: relative;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #f59e0b, #d97706);"></div>
+                <strong style="font-size: 1.1rem; color: #92400e; display: block; margin-bottom: 12px; position: relative; padding-left: 28px;">
+                📊 Tips
+                </strong>
+                <p style="color: #0f172a; margin: 0; line-height: 1.6;">
+                    Use your labeled groups to compare putative cell types. Z‑score emphasizes relative patterns; standard scaling helps when ranges differ widely. Keep N around 10–50 for clear figures.
+                </p>
+            </div>
+        </div>     
+     
+      </div>
+      <div class="help-modal-footer">
+        <button onclick="closeHelpModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const BASE_URL = window.API_BASE_URL || "/backend";
+    (function(){const l=document.getElementById('api-docs-link');if(l&&window.API_BASE_URL) l.href = `${window.API_BASE_URL}/docs`;})();
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const uuid = sessionStorage.getItem('uuid');
+      const analysisName = sessionStorage.getItem('analysisName');
+      document.getElementById('analysisInfoBox').innerHTML =
+        `Analysis Name: ${analysisName}<br>UUID: ${uuid} <i class="fas fa-copy" onclick="copyToClipboard('${uuid}')" style="cursor:pointer; font-size:14px;"></i>`;
+
+      if (!uuid) return;
+      fetchObsNames(uuid);
+      fetchGeneNames(uuid);
+      setupGeneSearch();
+
+      document.getElementById('runHeatmap').addEventListener('click', () => runHeatmap(uuid));
+
+      const stored = sessionStorage.getItem('cell_heatmap_payload');
+      if (stored) {
+        const data = JSON.parse(stored);
+        if (data.path) renderHeatmap(data);
+      }
+      
+      // Apply default theme settings to heatmap controls if theme manager is available
+      setTimeout(() => {
+        if (window.themeManager && window.themeManager.availableThemes) {
+          const currentTheme = window.themeManager.currentTheme || 'default';
+          console.log('Applying default theme to heatmap on page load:', currentTheme);
+          // Set default colorscale based on current theme if available
+          applyThemeToHeatmapSettings(currentTheme);
+        }
+      }, 1000);
+    });
+
+    function copyToClipboard(text){ navigator.clipboard.writeText(text).catch(console.error); }
+
+    function fetchObsNames(uuid){
+      fetch(`${BASE_URL}/obs_names?uuid=${encodeURIComponent(uuid)}`, { method: 'POST' })
+        .then(r => r.ok ? r.json() : Promise.reject('obs fetch failed'))
+        .then(cols => {
+          const sel = document.getElementById('groupby'); sel.innerHTML='';
+          cols.forEach(c => { const o=document.createElement('option'); o.value=o.textContent=c; sel.appendChild(o); });
+          const idx = Array.from(sel.options).findIndex(o => o.value === 'leiden');
+          if (idx >= 0) sel.selectedIndex = idx;
+        })
+        .catch(console.error);
+    }
+
+    function fetchGeneNames(uuid){
+      fetch(`${BASE_URL}/gene_names?uuid=${encodeURIComponent(uuid)}`, { method: 'POST' })
+        .then(r => r.ok ? r.json() : Promise.reject('gene fetch failed'))
+        .then(genes => populateGeneOptions(genes))
+        .catch(console.error);
+    }
+    function populateGeneOptions(genes){
+      const sel = document.getElementById('genes'); sel.innerHTML='';
+      genes.forEach(g => { const o=document.createElement('option'); o.value=o.textContent=g; sel.appendChild(o); });
+    }
+    function setupGeneSearch(){
+      document.getElementById('geneSearch').addEventListener('input', e => {
+        const term = e.target.value.toLowerCase();
+        Array.from(document.getElementById('genes').options).forEach(o => {
+          o.style.display = o.text.toLowerCase().includes(term) ? '' : 'none';
+        });
+      });
+    }
+
+    function showLoadingOverlay(message) {
+      const overlay = document.getElementById('loadingOverlay');
+      const p = overlay.querySelector('p');
+      if (p && message) p.textContent = message;
+      overlay.style.display = 'block';
+    }
+    function hideLoadingOverlay() {
+      document.getElementById('loadingOverlay').style.display = 'none';
+    }
+
+    function runHeatmap(uuid){
+      const btn = document.getElementById('runHeatmap');
+      const originalText = btn.textContent;
+      btn.textContent = 'Running...';
+      btn.disabled = true;
+      showLoadingOverlay('Running...');
+      const groupby = document.getElementById('groupby').value || 'leiden';
+      const topN = parseInt(document.getElementById('topN').value || '10', 10);
+      const zscore = document.getElementById('zscore').checked;
+      const standardScale = document.getElementById('standardScale').checked ? 'gene' : 'none';
+      const vminValue = document.getElementById('vmin').value;
+      const vmaxValue = document.getElementById('vmax').value;
+      const vmin = vminValue !== '' ? parseFloat(vminValue) : null;
+      const vmax = vmaxValue !== '' ? parseFloat(vmaxValue) : null;
+      const clusterRows = document.getElementById('clusterRows').checked;
+      const useRaw = document.getElementById('useRaw').checked;
+      const dendrogram = document.getElementById('dendrogram').checked;
+      const swapAxes = document.getElementById('swapAxes').checked;
+      const genesSel = Array.from(document.getElementById('genes').selectedOptions).map(o => o.value);
+      
+      // Get current theme from theme manager if available
+      const currentTheme = window.themeManager ? window.themeManager.currentTheme : 'default';
+
+      const payload = {
+        file_uuid: uuid,
+        groupby,
+        top_n: topN,
+        zscore,
+        standard_scale: standardScale,
+        cluster_rows: clusterRows,
+        cluster_cols: false,
+        use_raw: useRaw,
+        max_genes: topN,
+        dendrogram,
+        swap_axes: swapAxes,
+        theme: currentTheme
+      };
+      
+      // Add vmin/vmax if provided
+      if (vmin !== null) payload.vmin = vmin;
+      if (vmax !== null) payload.vmax = vmax;
+      if (genesSel.length > 0) payload.gene_list = genesSel;
+
+      fetch(`${BASE_URL}/cell_heatmap/`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(r => r.ok ? r.json() : r.text().then(t => Promise.reject(t)))
+      .then(data => { sessionStorage.setItem('cell_heatmap_payload', JSON.stringify(data)); renderHeatmap(data); })
+      .catch(err => { console.error('Heatmap failed:', err); alert('Heatmap failed: ' + err); })
+      .finally(() => { btn.textContent = originalText; btn.disabled = false; hideLoadingOverlay(); });
+    }
+
+    function renderHeatmap(data){
+      const img = document.getElementById('heatmapImage');
+      img.src = `${BASE_URL}/genes_vis/${data.path}?_=${Date.now()}`;
+      
+      // Adjust image dimensions based on swap axes state
+      const swapAxes = document.getElementById('swapAxes').checked;
+      if (swapAxes) {
+        // Horizontal layout - wider image
+        img.style.width = '100%';
+        img.style.maxWidth = '1600px';
+        img.style.maxHeight = '800px';
+      } else {
+        // Vertical layout - taller image  
+        img.style.width = '70%';
+        img.style.maxWidth = '1000px';
+        img.style.maxHeight = '1600px';
+      }
+      
+      const info = document.getElementById('heatmapInfo');
+      const missing = (data.genes_missing && data.genes_missing.length) ? `Missing: ${data.genes_missing.join(', ')}` : '';
+      info.textContent = missing;
+      document.getElementById('HeatmapResults').style.display = 'block';
+      document.getElementById('heatmapButtons').style.display = 'block';
+    }
+
+    function toggleSidebar(){
+      const sb=document.querySelector('.sidebar'); const btn=document.getElementById('toggleSidebarBtn'); const showBtn=document.getElementById('showSidebarBtn');
+      const sections=document.querySelectorAll('section,.embeding-box,.params-row');
+      if(sb.classList.contains('hidden')){
+        sb.classList.remove('hidden'); sections.forEach(s=>{s.style.marginLeft='250px'; s.style.width='80%';}); btn.style.display='block'; showBtn.style.display='none';
+      }else{
+        sb.classList.add('hidden'); sections.forEach(s=>{s.style.marginLeft='150px'; s.style.width='80%';}); btn.style.display='none'; showBtn.style.display='block';
+      }
+    }
+
+    function openHelpModal() {
+      document.getElementById('helpModal').style.display = 'block';
+    }
+
+    function closeHelpModal() {
+      document.getElementById('helpModal').style.display = 'none';
+    }
+
+    // Close modal when clicking outside of it
+    window.onclick = function(event) {
+      if (event.target === document.getElementById('helpModal')) {
+        closeHelpModal();
+      }
+    }
+
+    /* ---------- Export buttons, continue ---------- */
+    document.getElementById('continueToResults').onclick=()=>location.href='/scexplorer/results';
+
+    document.getElementById('exportData').onclick=function(){
+        const box=document.getElementById('exportOptions');
+        box.style.display=box.style.display==='none'?'block':'none'; box.innerHTML='';
+        const ul=document.createElement('ul');
+        ul.style.cssText='list-style:none;margin:0;padding:8px 0';
+        [
+            {label:'Export for Seurat',cb:exportForSeurat},
+            {label:'Export for Scanpy',cb:exportForScanpy}
+        ].forEach(o=>{
+            const li=document.createElement('li'); 
+            li.textContent=o.label;
+            li.style.cssText='padding:8px 16px;cursor:pointer;color:#374151;font-size:0.9rem;border-bottom:1px solid #f3f4f6';
+            li.onmouseenter=function(){this.style.backgroundColor='#f9fafb'};
+            li.onmouseleave=function(){this.style.backgroundColor='transparent'};
+            li.onclick=()=>{o.cb(); box.style.display='none';}; 
+            ul.appendChild(li);
+        });
+        box.appendChild(ul);
+    };
+    function exportForSeurat(){ exportGeneric('/seurat_export','rds'); }
+    function exportForScanpy(){ exportGeneric('/scanpy_export','h5ad'); }
+    function exportGeneric(endpoint,ext){
+        const uuid=sessionStorage.getItem('uuid');
+        if(!uuid) return;
+        const a=document.createElement('a');
+        a.href=`${BASE_URL}${endpoint}?uuid=${encodeURIComponent(uuid)}`;
+        a.download=`heatmap_data.${ext}`;
+        a.click();
+    }
+
+    function toggleColorRangeControls() {
+        const zscoreChecked = document.getElementById('zscore').checked;
+        const standardScaleChecked = document.getElementById('standardScale').checked;
+        const colorRangeControls = document.getElementById('colorRangeControls');
+        const colorRangeControls2 = document.getElementById('colorRangeControls2');
+        
+        // Show color range controls only when Z-score is selected and standard scale is not
+        if (zscoreChecked && !standardScaleChecked) {
+            colorRangeControls.style.display = 'block';
+            colorRangeControls2.style.display = 'block';
+        } else {
+            colorRangeControls.style.display = 'none';
+            colorRangeControls2.style.display = 'none';
+        }
+    }
+
+    // Theme manager integration for heatmap regeneration
+    window.regenerateHeatmap = function() {
+        const uuid = sessionStorage.getItem('uuid');
+        if (!uuid) {
+            console.log('No UUID found for heatmap regeneration');
+            return;
+        }
+        
+        // Check if we have existing heatmap data to regenerate
+        const stored = sessionStorage.getItem('cell_heatmap_payload');
+        if (stored && document.getElementById('HeatmapResults').style.display === 'block') {
+            console.log('Regenerating heatmap with current settings and new theme');
+            runHeatmap(uuid);
+        } else {
+            console.log('No existing heatmap to regenerate');
+        }
+    };
+
+    // Apply theme settings to heatmap controls
+    function applyThemeToHeatmapSettings(themeName) {
+        // This function will be called when theme changes or on page load
+        console.log('Applying theme settings to heatmap:', themeName);
+        
+        // You can add specific theme-based defaults here
+        // For now, we'll let the backend handle the theme application
+        // But we could set UI defaults based on theme if needed
+        
+        // Example: Set default colorscale based on theme
+        const colorscaleSelect = document.querySelector('select[id="groupby"]')?.closest('.embeding-box')?.querySelector('.colorscale-select');
+        if (colorscaleSelect) {
+            // Set different default colorscales for different themes
+            switch(themeName) {
+                case 'dark':
+                    // Dark theme might prefer different colorscales
+                    break;
+                case 'high_contrast':
+                    // High contrast theme preferences
+                    break;
+                case 'colorblind_friendly':
+                    // Colorblind friendly preferences
+                    break;
+                default:
+                    // Default theme settings
+                    break;
+            }
+        }
+    }
+    
+    // Connect to theme manager when it's available
+    window.addEventListener('load', () => {
+        if (window.themeManager) {
+            console.log('Theme manager connected to heatmap page');
+        }
+    });
+  </script>
+  <script src="/scexplorer/js/theme-manager-new.js"></script>
+  <script>
+    // Initialize theme manager instance and connect heatmap regeneration
+    document.addEventListener('DOMContentLoaded', () => {
+      if (typeof ThemeManager !== 'undefined') {
+        window.themeManager = new ThemeManager();
+        
+        // Override the refreshPagePlots method to include heatmap regeneration
+        const originalRefreshPagePlots = window.themeManager.refreshPagePlots;
+        window.themeManager.refreshPagePlots = function() {
+          // Call the original method
+          originalRefreshPagePlots.call(this);
+          
+          // Also regenerate heatmap if available
+          if (typeof window.regenerateHeatmap === 'function') {
+            setTimeout(() => {
+              window.regenerateHeatmap();
+            }, 500);
+          }
+        };
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>scExplorer - Cluster Labeling</title>
+    <link rel="icon" href="/scexplorer/images/logo_sc_explorer_v1.ico" type="image/x-icon">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="/scexplorer/css/styles.css">
+    <link rel="stylesheet" href="/scexplorer/css/theme-popup.css" />
+    <script src="/scexplorer/js/help-enhancements.js"></script>
+    <script src="/config.js"></script>
+    <script src="/scexplorer/js/api-base.js"></script>
+</head>
+
+<body>
+    <aside class="sidebar">
+        <img src="/scexplorer/images/logo_sc_explorer_v1.png" alt="scExplorer logo" class="sidebar-logo" />
+        <h1 class="sidebar-title">scExplorer</h1>
+        <ul>
+            <li><a href="/scexplorer/"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="/scexplorer/integration"><i class="fas fa-layer-group"></i>Integration</a></li>
+            <li><a href="/scexplorer/upload"><span class="step-number">0</span> <i class="fas fa-upload"></i> Upload</a></li>
+            <li><a href="/scexplorer/preprocess"><span class="step-number">1</span> <i class="fas fa-cogs"></i> Preprocess</a></li>
+            <li><a href="/scexplorer/embedding"><span class="step-number">2</span> <i class="fas fa-vector-square"></i> Embedding</a></li>
+            <li><a href="/scexplorer/dea"><span class="step-number">3</span> <i class="fas fa-chart-bar"></i> DEA</a></li>
+            <li><a href="/scexplorer/visualization"><span class="step-number">4</span> <i class="fas fa-chart-area"></i> Visualization</a></li>
+            <li><a href="/scexplorer/heatmap"><span class="step-number">5</span> <i class="fas fa-th"></i> Heatmap</a></li>
+            <li><a href="/scexplorer/results"><span class="step-number">6</span> <i class="fas fa-poll"></i> Results</a></li>
+        </ul>
+        <div class="sidebar-divider"></div>
+        <ul class="documentation-section">
+            <li><a id="api-docs-link" href="https://apps.cienciavida.org/backend/docs" target="_blank"><i class="fas fa-book"></i> API Documentation</a></li>
+        </ul>
+        <div class="resizer"></div>
+        <i id="toggleSidebarBtn" class="fas fa-angle-double-left white-icon" onclick="toggleSidebar()"></i>
+    </aside>
+    <button id="showSidebarBtn" class="show-sidebar-btn" onclick="toggleSidebar()"><i class="fas fa-angle-double-right"></i></button>
+
+    <section>
+        <div id="loadingOverlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:100;">
+            <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);">
+                <div style="color:white; font-size:20px; text-align:center;">
+                    <p>Loading...</p>
+                    <img src="/scexplorer/images/loading3.svg" alt="Loading..." style="display:block; margin:auto;" />
+                </div>
+            </div>
+        </div>
+
+        <div class="header-buttons">
+            <button onclick="openHelpModal()">Help</button>
+        </div>
+        <h2><i class="fas fa-tags"></i> Cluster Labeling</h2>
+        <div id="analysisInfoBox"></div>
+    </section>
+
+    <div class="embeding-box">
+        <div class="labeling-layout" style="display:flex; gap:16px; align-items:flex-start;">
+            <!-- Left: UMAP -->
+            <div class="labeling-left" style="flex:2 1 0; display:flex; justify-content:center;">
+                <div id="plotContainer" class="plots-container" style="display:flex; justify-content:center; width:100%;"></div>
+            </div>
+            <!-- Right: Labels -->
+            <div class="labeling-right" style="flex:1 1 260px; max-width:320px;">
+                <h3 style="margin:0 0 8px 0; font-size:1rem;">Assign Labels</h3>
+                <p style="margin:0 0 12px 0; font-size:0.85rem; color:#6b7280;">💡 Tip: Use the same label name for multiple clusters to merge them together.</p>
+                <form id="labelingForm">
+                    <div id="labelInputs" class="labels-grid" style="display:flex; flex-wrap:wrap; gap:6px; max-height:560px; overflow-y:auto; padding-right:4px;"></div>
+                    <div style="display:flex; gap:10px; margin-top:10px;">
+                        <button type="submit" class="save-btn" style="padding:6px 12px; border:none; border-radius:6px; background:#000000; color:#ffffff; cursor:pointer; font-size:0.9rem;">Save Labels</button>
+                        <span id="saveStatus" style="align-self:center; color:#4b5563; font-size:0.85rem;"></span>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="modal_help">
+        <div class="modal_help-content">
+            <div class="modal_help-header">
+                <span class="close" onclick="closeHelpModal()">&times;</span>
+                <h2>Cluster Labeling Help</h2>
+            </div>
+            <div class="modal_help-body">
+                <div class="help-section">
+                    <p>
+                        This step lets you assign biological labels to the data-driven clusters from Leiden. Use the same name for different clusters to merge them into a single cell type.
+                    </p>
+                    <p>
+                        The interface has three key areas: <strong>(1)</strong> UMAP colored by Leiden clusters, <strong>(2)</strong> Assign Labels panel to type names for each cluster, and <strong>(3)</strong> Save Labels to apply your mapping.
+                    </p>
+                    <img src="/scexplorer/images/labeling_1.png" alt="Labeling tutorial - original Leiden clusters" />
+                </div>
+
+                <div class="help-section">
+                    <p>
+                        After saving, the UMAP updates to display your new labels. Any clusters that share the same label appear merged under that name.
+                    </p>
+                    <img src="/scexplorer/images/labeling_2.png" alt="Labeling tutorial - updated labels applied" />
+                </div>
+
+                <div class="info-box">
+                    <strong>Next in the pipeline</strong>
+                    <p>
+                        Once labels are saved, click <em>Continue to DEA</em> to run differential expression analysis on your labeled cell types.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Outside, centered action row aligned to containers -->
+    <div class="button-container-results" id="labelingActions" style="margin: 30px 650px; padding: 0; display:none;">
+        <div class="button-row" style="display:flex; justify-content:center; align-items:center; gap:20px; flex-wrap:wrap;">
+            <div class="upload-btn">
+                <button id="goToDEA" style="padding: 8px 16px; font-size: 0.9rem; min-width: 160px; line-height: 1.2; display:flex; align-items:center; justify-content:center; height:36px;">Continue to DEA</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = window.API_BASE_URL || "/backend";
+        (function(){const l=document.getElementById('api-docs-link');if(l&&window.API_BASE_URL) l.href = `${window.API_BASE_URL}/docs`;})();
+        // Persist last known plot dimensions to keep size stable across label edits
+        window._labelingPlotDims = window._labelingPlotDims || null;
+
+        window.onload = function () {
+            const uuid = sessionStorage.getItem("uuid");
+            const analysisNameValue = sessionStorage.getItem("analysisName");
+
+            if (!uuid) {
+                alert("No analysis selected. Please go back to the upload step.");
+                window.location.href = "/scexplorer/upload";
+                return;
+            }
+
+            document.getElementById("analysisInfoBox").innerHTML = `
+                Analysis Name: ${analysisNameValue}<br>
+                UUID: ${uuid} <i class="fas fa-copy" onclick="copyToClipboard('${uuid}')" style="cursor: pointer; font-size: 14px;"></i><br>
+            `;
+
+            loadLabelingData(uuid);
+        };
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(function () {
+                // Optional: show a confirmation message
+            }, function (err) {
+                console.error('Could not copy text: ', err);
+            });
+        }
+
+        function loadLabelingData(uuid) {
+            document.getElementById('loadingOverlay').style.display = 'block';
+            // This is a placeholder for the new backend endpoint
+            fetch(`${BASE_URL}/labeling_data/${uuid}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.plot_path && data.num_clusters) {
+                        // Centered UMAP (narrower width, increased height)
+                        const plotContainer = document.getElementById("plotContainer");
+                        plotContainer.innerHTML = '';
+                        const iframe = document.createElement("iframe");
+                        iframe.src = `${BASE_URL}/plots_embedding/${data.plot_path}`;
+                        iframe.title = "Cluster Plot";
+                        iframe.className = "plot-iframe";
+                        // Slightly increase plot width for better visibility (will be locked to px on load)
+                        iframe.style.width = '75%';
+                        iframe.style.height = '640px';
+                        iframe.style.border = 'none';
+                        iframe.onload = function () {
+                            try {
+                                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                                if (!doc) return;
+                                // Ensure the inner page can expand
+                                const body = doc.body; if (body) { body.style.margin='0'; body.style.padding='0'; body.style.width='100%'; }
+                                const html = doc.documentElement; if (html) { html.style.width='100%'; }
+                                // Resize Plotly plot if present
+                                const plotDiv = doc.querySelector('.js-plotly-plot, [id^="plotly-div"]');
+                                const P = iframe.contentWindow && iframe.contentWindow.Plotly;
+                                // Compute target size once and persist to avoid size changes later
+                                const cached = window._labelingPlotDims;
+                                const frameWidth = iframe.clientWidth || plotContainer.clientWidth;
+                                const computedWidth = Math.max(520, Math.floor((frameWidth || 800) * 0.98));
+                                const targetWidth = (cached && cached.w) ? cached.w : computedWidth;
+                                const targetHeight = (cached && cached.h) ? cached.h : 640;
+                                if (plotDiv) {
+                                    plotDiv.style.width = targetWidth + 'px';
+                                    plotDiv.style.height = targetHeight + 'px';
+                                    if (P) {
+                                        // Increase marker size and legend font for better readability
+                                        try { P.restyle(plotDiv, { 'marker.size': 7, 'marker.opacity': 0.9 }); } catch(e) {}
+                                        try { P.relayout(plotDiv, { width: targetWidth, height: targetHeight, 'legend.font.size': 14, 'font.size': 13, 'title.text': '', 'legend.title.text': '' }); } catch(e) {}
+                                    }
+                                }
+                                // Lock iframe width to the resolved px to keep stable across reloads
+                                iframe.style.width = targetWidth + 'px';
+                                // Persist for future reloads
+                                window._labelingPlotDims = { w: targetWidth, h: targetHeight };
+                                // Fallback for images
+                                const img = doc.querySelector('img');
+                                if (img) { img.style.maxWidth='100%'; img.style.height='auto'; }
+                                // Trigger resize listeners within iframe (Plotly responds to this)
+                                iframe.contentWindow && iframe.contentWindow.dispatchEvent(new Event('resize'));
+                            } catch (e) {
+                                console.log('Labeling iframe resize failed:', e);
+                            }
+                        };
+                        plotContainer.appendChild(iframe);
+
+                        // Horizontal, aesthetic labels grid
+                        const labelInputs = document.getElementById("labelInputs");
+                        labelInputs.innerHTML = "";
+                        for (let i = 0; i < data.num_clusters; i++) {
+                            const card = document.createElement('div');
+                            card.style.cssText = 'display:flex; align-items:center; gap:6px; padding:6px 8px; border:1px solid #e5e7eb; border-radius:8px; background:#ffffff;';
+                            const badge = document.createElement('span');
+                            badge.textContent = `C${i}`;
+                            badge.style.cssText = 'display:inline-block; min-width:22px; text-align:center; padding:2px 6px; border-radius:999px; background:#f3f4f6; color:#374151; font-weight:600; font-size:0.8rem;';
+                            const input = document.createElement('input');
+                            input.type = 'text';
+                            input.id = `cluster_${i}`;
+                            input.name = `labels[${i}]`;
+                            input.placeholder = `Label for C${i}`;
+                            input.required = true;
+                            input.style.cssText = 'padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; min-width:160px; font-size:0.9rem;';
+                            card.appendChild(badge);
+                            card.appendChild(input);
+                            labelInputs.appendChild(card);
+                        }
+                    } else {
+                        alert("Could not load labeling data. Please make sure the embedding step was completed successfully.");
+                    }
+                    document.getElementById('loadingOverlay').style.display = 'none';
+                })
+                .catch(error => {
+                    console.error("Error loading labeling data:", error);
+                    alert("An error occurred while loading the labeling data.");
+                    document.getElementById('loadingOverlay').style.display = 'none';
+                });
+        }
+
+        document.getElementById("labelingForm").addEventListener("submit", function (event) {
+            event.preventDefault();
+            const uuid = sessionStorage.getItem("uuid");
+            const formData = new FormData(this);
+            const labels = [];
+            for (let i = 0; i < document.querySelectorAll('[name^="labels"]').length; i++) {
+                labels.push(formData.get(`labels[${i}]`));
+            }
+
+            document.getElementById('loadingOverlay').style.display = 'block';
+            // This is a placeholder for the new backend endpoint
+            fetch(`${BASE_URL}/labeling/${uuid}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ labels: labels }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const saveStatus = document.getElementById('saveStatus');
+                    if (saveStatus) saveStatus.textContent = 'Labels saved successfully';
+                    // Show action row to continue to DEA
+                    const actions = document.getElementById('labelingActions');
+                    if (actions) actions.style.display = 'block';
+                    // Reload the plot iframe to reflect updated labels
+                    const plotIframe = document.querySelector('#plotContainer iframe');
+                    if (plotIframe) {
+                        // Pre-set width to cached px to avoid transient layout shifts
+                        if (window._labelingPlotDims && window._labelingPlotDims.w) {
+                            plotIframe.style.width = window._labelingPlotDims.w + 'px';
+                            plotIframe.style.height = (window._labelingPlotDims.h || 640) + 'px';
+                        }
+                        const base = plotIframe.src.split('?')[0];
+                        plotIframe.src = base + '?label_refresh=' + Date.now();
+                    }
+                } else {
+                    alert("Failed to save labels: " + data.message);
+                }
+                document.getElementById('loadingOverlay').style.display = 'none';
+            })
+            .catch(error => {
+                console.error("Error saving labels:", error);
+                alert("An error occurred while saving the labels.");
+                document.getElementById('loadingOverlay').style.display = 'none';
+            });
+        });
+
+    </script>
+    <script>
+        // Help modal controls
+        function openHelpModal() {
+            const m = document.getElementById('helpModal');
+            if (m) m.style.display = 'block';
+        }
+        function closeHelpModal() {
+            const m = document.getElementById('helpModal');
+            if (m) m.style.display = 'none';
+        }
+        window.addEventListener('click', function (event) {
+            const modal = document.getElementById('helpModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    </script>
+    <script>
+        // Continue button handler
+        document.addEventListener('DOMContentLoaded', function() {
+            const goBtn = document.getElementById('goToDEA');
+            if (goBtn) {
+                goBtn.addEventListener('click', function(){
+                    window.location.href = '/scexplorer/dea';
+                });
+            }
+        });
+    </script>
+    
+    <script src="/scexplorer/js/theme-manager-new.js"></script>
+    <script src="/scexplorer/js/sidebar.js"></script>
+</body>
+</html>

@@ -1,0 +1,2099 @@
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Poppins', sans-serif;
+    font-size: 16px;
+    color: #333;
+    background-color: #f7f9fc;
+    padding-top: 60px;
+}
+
+.bottom-buttons {
+    display: flex;
+    justify-content: flex-end;
+    margin-right: 5px;
+}
+
+.header-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-bottom: 1px;
+    align-self: flex-end;
+    margin-bottom: -35px;
+}
+
+.header-buttons button {
+    width: auto;
+    height: 35px;
+    border: none;
+    border-radius: 10px;
+    padding: 8px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    background-color: #ffffff;
+    color: #333;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s;
+}
+
+.header-buttons button:hover {
+    background-color: #f1f1f1;
+}
+
+section {
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 30px;
+    margin-top: 20px;
+    width: 83%;
+    max-width: 2000px;
+    margin-left: 220px;
+    margin-right: auto;
+
+}
+
+.options-container {
+    display: flex; /* Arrange items horizontally */
+    flex-wrap: nowrap; /* Prevent items from wrapping */
+    gap: 20px; /* Add space between the boxes */
+    margin: 20px auto; /* Align the container with the spacing of the container above */
+    justify-content: center; /* Align items to the start */
+    margin-left: 220px;
+    margin-right: auto;
+    align-items: stretch; /* Make all items the same height */
+    width: 83%; /* Match the width of the container above */
+    max-width: 2000px;
+}
+
+/* Align action button rows with main content containers (not full page) */
+.button-container-results {
+    width: 83%;
+    max-width: 2000px;
+    margin-left: 220px;
+    margin-right: auto;
+}
+
+.uuid-box,
+.parameters-box {
+    flex: 1; /* Both boxes will take equal space */
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 30px;
+}
+
+.parameters-box .input-group {
+    margin-top: 9px; /* Add space between the button and the upper content */
+}
+
+.preprocess-box {
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 30px;
+    width: 83%;
+    max-width: 2000px;
+    margin-left: 220px;
+    margin-right: auto;
+    margin-bottom: 40px;
+}
+.preprocess-box {
+    margin-top: 40px; /* Increased from 20px to 40px */
+}
+
+
+
+
+
+.embedding-box {
+    margin-top: 40px; /* Ensure there's sufficient space above embedding box */
+}
+
+.embeding-box {
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 30px;
+    width: 83%;
+    max-width: 2000px;
+    margin-left: 220px;
+    margin-right: auto;
+}
+.embeding-box {
+    margin-top: 40px; /* Increased from 20px to 40px */
+    margin-bottom: 40px
+}
+h2, h3 {
+    font-weight: 600;
+    margin-bottom: 40px;
+}
+
+h3.toggle {
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+h3.toggle:hover {
+    background-color: #f1f1f1;
+}
+
+.input-group, .actions {
+    margin-bottom: 20px;
+}
+
+i.fas {
+    margin-right: 10px;
+}
+
+/* Exclude close icon from default icon spacing */
+i.fas.fa-times,
+i.fas.fa-xmark {
+    margin-right: 0;
+}
+
+/* Do not add spacing to the add-color button icon */
+.add-color-btn i.fas {
+    margin-right: 0;
+}
+input, select, button {
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+
+
+.two-columns {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.column {
+    flex: 1;
+    padding: 0 10px;
+}
+
+.column-dea{
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px;
+}
+
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    margin-left: 80%; /* Adjust this value to position the logo correctly */
+    margin-top: -85px; /* Move the logo up */
+
+}
+
+.logo-container2 {
+    display: flex;
+    align-items: center;
+    margin-left: 250px; /* Adjust this value to position the logo correctly */
+    margin-top: -30px; /* Move the logo up */
+
+}
+
+.logo-netbio {
+    display: flex;
+    align-items: center;
+    margin-left: 45%; /* Adjust this value to position the logo correctly */
+    margin-top: -60px; /* Move the logo up */
+
+}
+
+.logo-container2 .header-logo {
+    transform: scale(1.5); /* Escala el logo a 1.5x */
+}
+
+/* Sidebar styling */
+.sidebar {
+    width: 180px;
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    background-color: #333;
+    overflow-y: auto;
+    padding: 20px 10px;
+    overflow-x: hidden; 
+    transition: transform 0.5s ease;
+}
+
+.sidebar ul {
+    list-style-type: none;
+}
+
+.sidebar ul li {
+    margin: 15px 0;
+}
+
+.sidebar a {
+    color: #fff;
+    text-decoration: none;
+    font-size: 16px;
+    transition: color 0.3s;
+}
+
+.sidebar a:hover {
+    background-color: #555;
+    padding: 5px 10px;
+    border-radius: 4px;
+}
+
+/* Active/Current page highlighting */
+.sidebar a.active {
+    background-color: #4a90e2;
+    padding: 5px 10px;
+    border-radius: 4px;
+    border-bottom: 3px solid #ffffff;
+    font-weight: 600;
+}
+
+.sidebar a.active:hover {
+    background-color: #357abd;
+}
+
+.sidebar-title {
+    font-size: 18px;
+    color: #ffffff;
+    text-align: center;
+    margin-bottom: 20px;
+    padding: 10px 0;
+    border-bottom: 2px solid #444;
+}
+
+/* API Documentation section styling */
+.sidebar-divider {
+    height: 1px;
+    background-color: #555;
+    margin: 20px 0 15px 0;
+}
+
+.documentation-section {
+    margin-top: 15px;
+}
+
+.documentation-section li a {
+    color: #bbb !important;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.documentation-section li a:hover {
+    color: #fff !important;
+    background-color: #4a4a4a;
+    opacity: 1;
+}
+
+.documentation-section li a i {
+    margin-right: 8px;
+    color: #888;
+}
+
+.resizer {
+    width: 10px;
+    height: 100%;
+    background-color: rgba(0,0,0,0.1);
+    cursor: ew-resize;
+    position: absolute;
+    top: 0;
+    right: 0;
+}
+
+.preprocessing-plots-container .row {
+    margin-bottom: -10px;
+}
+.row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    padding-top: 5px;     /* Adjust as per your needs */
+    padding-bottom: 5px;
+    margin: 0 -10px;
+}
+
+.column.third {
+    width: 33.3333%;
+    box-sizing: border-box; 
+    padding: 0 10px; /* optional: adjust as needed for spacing */
+}
+
+.upload-container {
+    border: 3px dotted hwb(0 91% 9%);
+    border-radius: 8px;
+    padding: 40px 20px;
+    margin: 20px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    background-color: #f7f9fc;
+    position: relative;
+}
+
+.upload-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 20px;
+}
+
+.drag-drop-area {
+    border: 2px dotted #dcdcdc;
+    border-radius: 8px;
+    padding: 40px 20px;
+    margin: 20px 0;
+    position: relative;
+    background-color: #f7f9fc;
+}
+
+.upload-icon {
+    font-size: 32px;
+    color: #dcdcdc;
+    margin-bottom: 20px;
+}
+
+.upload-instructions {
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.upload-instructions a {
+    color: #333;
+    text-decoration: underline;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.upload-btn {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-bottom: 1px;
+    align-self: flex-end;
+}
+.upload-btn button {
+    font-size: 20px; /* Increase the font size for prominence */
+
+    width: auto;
+    height: 35px;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    background-color: #000000;
+    color: #ffffff;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s;
+    margin-bottom: 11px;
+}
+
+.upload-btn button:hover {
+    background-color: #0a5197;
+}
+
+.upload-container .dotted-border {
+    border: 2px dashed #333;
+}
+
+.upload-container.drag-over {
+    background-color: hwb(96 94% 2%);
+    color: #000;
+}
+
+.upload-container i.fas {
+    color: #333;
+}
+
+.upload-container.drag-over i.fas {
+    color: #000;
+}
+
+
+
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    z-index: 8000;
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        backdrop-filter: blur(0px);
+    }
+    to {
+        opacity: 1;
+        backdrop-filter: blur(8px);
+    }
+}
+
+.modal-content {
+    font-family: 'Poppins', sans-serif;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 0;
+    width: 95%;
+    max-width: 900px;
+    max-height: 90vh;
+    background: white;
+    text-align: left;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    border-radius: 16px;
+    overflow: hidden;
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -60%);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
+}
+
+.modal-content .close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 36px;
+    height: 36px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #374151;
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: bold;
+    transition: all 0.2s ease;
+    z-index: 10;
+}
+
+.modal-content .close:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    transform: scale(1.1);
+}
+
+/* Modal Header */
+.modal-content h2 {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    margin: 0;
+    padding: 24px 30px 20px 30px;
+    font-size: 1.4rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.modal-content h2::before {
+    content: "";
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    background-image: url('/scexplorer/images/logo_sc_explorer_v1.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+/* Modal Body */
+.modal-body {
+    padding: 30px;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+/* Dataset Grid Improvements */
+.dataset-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+    gap: 20px !important;
+    margin: 20px 0 !important;
+}
+
+/* Dataset Card Improvements */
+.dataset-card {
+    display: flex !important;
+    gap: 16px !important;
+    align-items: flex-start !important;
+    border: 2px solid #e5e7eb !important;
+    border-radius: 12px !important;
+    padding: 20px !important;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+    transition: all 0.3s ease !important;
+    cursor: pointer !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+.dataset-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    transform: scaleX(0);
+    transition: transform 0.3s ease;
+}
+
+.dataset-card:hover {
+    border-color: #667eea !important;
+    background: linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%) !important;
+    transform: translateY(-4px) !important;
+    box-shadow: 0 12px 32px rgba(102, 126, 234, 0.15) !important;
+}
+
+.dataset-card:hover::before {
+    transform: scaleX(1);
+}
+
+/* Dataset Icon Improvements */
+.dataset-icon {
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
+}
+
+.dataset-card:hover .dataset-icon {
+    transform: scale(1.05);
+}
+
+/* Dataset Info Improvements */
+.dataset-info {
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+
+.dataset-info > div:first-child {
+    font-weight: 600 !important;
+    color: #111827 !important;
+    margin-bottom: 8px !important;
+    font-size: 1.1rem !important;
+}
+
+.dataset-info > div:nth-child(2) {
+    color: #374151 !important;
+    font-size: 0.9rem !important;
+    line-height: 1.5 !important;
+    margin-bottom: 16px !important;
+}
+
+/* Dataset Actions */
+.dataset-actions {
+    display: flex !important;
+    gap: 12px !important;
+    align-items: center !important;
+    margin-top: 16px !important;
+}
+
+.dataset-actions a {
+    font-weight: 600 !important;
+    color: #667eea !important;
+    text-decoration: none !important;
+    font-size: 0.9rem !important;
+    transition: color 0.2s ease !important;
+}
+
+.dataset-actions a:hover {
+    color: #5a6fd8 !important;
+}
+
+.dataset-actions button {
+    margin-left: auto !important;
+    padding: 10px 20px !important;
+    border: none !important;
+    background: linear-gradient(135deg, #111827 0%, #374151 100%) !important;
+    color: white !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 4px 12px rgba(17, 24, 39, 0.2) !important;
+}
+
+.dataset-actions button:hover {
+    background: linear-gradient(135deg, #1f2937 0%, #4b5563 100%) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 16px rgba(17, 24, 39, 0.3) !important;
+}
+
+/* Modal Footer Tip */
+.modal-content > div:last-child {
+    font-size: 0.85rem !important;
+    color: #6b7280 !important;
+    margin-top: 16px !important;
+    padding: 16px 20px !important;
+    background: #f9fafb !important;
+    border-top: 1px solid #e5e7eb !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.modal-content > div:last-child::before {
+    content: "";
+    font-size: 1rem;
+}
+
+/* Responsive Design for Modal */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 98%;
+        max-width: none;
+        max-height: 95vh;
+        margin: 10px;
+    }
+
+    .modal-content h2 {
+        padding: 20px 20px 16px 20px;
+        font-size: 1.2rem;
+    }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+    .dataset-grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+
+    .dataset-card {
+        padding: 16px !important;
+        gap: 12px !important;
+    }
+
+    .dataset-info > div:first-child {
+        font-size: 1rem !important;
+    }
+
+    .dataset-actions button {
+        padding: 8px 16px !important;
+        font-size: 0.85rem !important;
+    }
+
+    .modal-content .close {
+        top: 15px;
+        right: 15px;
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .dataset-card {
+        flex-direction: column !important;
+        align-items: center !important;
+        text-align: center !important;
+        padding: 20px !important;
+    }
+
+    .dataset-actions {
+        flex-direction: column !important;
+        gap: 8px !important;
+        width: 100% !important;
+    }
+
+    .dataset-actions button {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+}
+
+.modal-icon {
+    font-size: 8rem;
+    margin-bottom: 10px;
+    display: block;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.uuid-container {
+    margin-top: 20px;
+    display: block;
+    width: 100%;
+    text-align: center;
+    background-color: #f1f1f1;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.copy-button {
+    margin-left: 10px;
+}
+
+button {
+    width: auto;
+    padding: 5px 15px;
+    border: none;
+    background-color: #000000;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+button:hover {
+    background-color: #555;
+}
+
+.uuid-display-container {
+    width:  auto;
+    padding: 5px 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.uuid-display-container textarea {
+    flex-grow: 1;
+    padding: 10px;
+    font-size: 18px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+#uuidText {
+    padding: 5px;
+    border: none;
+    background-color: #1d0e71; 
+    color: white;
+    border-radius: 5px;
+    width: 30px;
+    resize: none;
+}
+
+.sidebar-logo {
+    display: block;
+    max-width: 50%; 
+    margin: 1px auto; 
+    border-radius: 5px; 
+}
+
+.column.half {
+    width: 50%;
+    float: left;
+    padding: 0 10px;
+}
+
+.response-container {
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin-top: 20px;
+    display: none; 
+}
+
+
+.plots-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+.plots-title {
+    text-align: left;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+.custom-btn {
+    width: auto;
+    height: 35px;
+    border: none;
+    border-radius: 10px;
+    padding: 8px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    background-color: #ffffff;
+    color: #333;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s;
+}
+
+.custom-btn:hover {
+    background-color: #f1f1f1;
+}
+
+
+
+.category-box {
+    border: 1px solid #e0e0e0;
+    padding: 20px;
+    margin: 20px 0;
+    border-radius: 5px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.category-box h3 {
+    font-size: 18px;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.plot-row {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.plot-image {
+    width: 49%; /* This gives a tiny gap between images. Adjust as needed. */
+    height: auto;
+}
+
+.plot-iframe {
+    /* Default to full-width inside containers unless a row layout scopes it */
+    width: 100%;
+    height: 400px; /* sensible default; pages can override inline */
+    border: none;
+}
+
+/* Only shrink to half-width when explicitly inside a two-up plot row */
+.plot-row .plot-iframe {
+    width: 49%;
+}
+
+#plotsContainer iframe {
+    width: 100%;
+    height: 400px;
+    margin-bottom: 20px; /* Spacing between the iframes */
+    border: none; /* To remove default iframe border */
+}
+
+
+
+/* Add this CSS to your existing <style> tag
+.sidebar.hidden {
+    display: none;
+} */
+
+/* Style the icon in the sidebar */
+
+/* Style the icon in the main section */
+section i#showSidebarBtn {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    cursor: pointer;
+}
+
+/* Style the white icons */
+.white-icon {
+    color: white;
+}
+
+
+
+/* CSS for the "Show Sidebar" button container */
+#showSidebarContainer {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    z-index: 500;
+}
+
+/* Style the "Show Sidebar" button */
+.button-container {
+    position: relative;
+    display: flex;
+    justify-content: flex-end; /* optional: to space the buttons apart */
+    gap: 20px;
+    margin-top: 80px;
+
+}
+
+.params-row {
+    display: flex;         /* Use flexbox to layout the children */
+    justify-content: space-between;  /* Distribute the children with equal space between */
+    flex-wrap: wrap;       /* Allow items to wrap to next line if necessary */
+}
+
+.input-group {
+    flex: 1;               /* Each input group takes up equal width */
+    margin: 0 10px;        /* Some margin for spacing */
+}
+
+.params-box {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0px; /* space between items */
+}
+
+.uuid-box .input-group {
+    display: flex;
+    align-items: center; /* This aligns the items vertically in the center. */
+    gap: 8px; /* This adds space between the input and the button. */
+}
+
+.uuid-box label {
+    display: block; /* Makes the label take the full width, pushing everything below it */
+    margin-bottom: 8px; /* Adds some space below the label */
+}
+
+
+
+
+    
+/* Other styles... */
+
+.control-btns {
+    display: flex;
+    justify-content: flex-end; /* Adjust this to 'center' or 'flex-end' based on your preference */
+    gap: 10px; /* Space between buttons */
+    margin-top: 20px; /* Space above the buttons */
+    align-items: center; /* Vertical alignment */
+    position: relative; /* Relative positioning for dropdown */
+}
+
+
+
+#exportOptions {
+    display: none;
+    position: absolute;
+    background-color: #f9f9f9;
+    min-width: 100px;
+    box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    bottom: 100%;
+    z-index: 1;
+}
+
+#exportOptions ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+}
+
+#exportOptions ul li {
+    padding: 10px 20px;
+    cursor: pointer;
+    display: flex;
+    border-radius: 5px;
+}
+
+#exportOptions ul li:hover {
+    background-color: #ddd;
+}
+
+
+#exportOptionsPre {
+    display: none;
+    position: absolute;
+    background-color: #f9f9f9;
+    min-width: 160px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    border-radius: 4px;
+    bottom: 100%;  /* Position above the button */
+    right: 0;      /* Align to the right edge (near the button) */
+    left: auto;
+    margin-bottom: 4px;  /* Space between button and the dropdown */
+    z-index: 10;
+}
+
+#exportOptionsPre ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+}
+
+#exportOptionsPre ul li {
+    padding: 10px 20px;
+    cursor: pointer;
+}
+
+#exportOptionsPre ul li:hover {
+    background-color: #ddd;
+}
+
+.preprocessing-result {
+    display: flex;
+    justify-content: flex-start; /* Aligns items at the start of the row */
+    flex-wrap: wrap; /* Allows items to wrap onto the next line */
+}
+
+.selected-genes {
+    padding: 5px;
+    margin-top: 20px;
+    border: 1px solid #ffffff;
+    min-height: 60px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    background-color: #ffffff;
+    font-size: 12px;
+}
+
+.selected-gene {
+    padding: 5px 10px; /* Add horizontal padding */
+    background-color: #053c78;
+    color: white;
+    border-radius: 10px;
+    display: inline-flex; /* Use inline-flex to take only necessary space */
+    align-items: center;
+    gap: 3px;
+    font-size: 12px;
+    margin: 5px; /* Add margin for better spacing */
+    white-space: nowrap; /* Prevent text from wrapping */
+    max-width: 200px; /* Set a max-width to limit the background width */
+    max-height: 30px;
+}
+
+
+.selected-gene .close {
+    cursor: pointer;
+    font-size: 14px; /* Adjust font size for better alignment */
+    padding-left: 5px; /* Add padding to create space around the close button */
+}
+#selectedGenesContainer {
+    display: flex;
+    flex-wrap: wrap; /* Wrap the selected genes */
+    gap: 10px; /* Add some spacing between selected genes */
+}
+
+
+
+.header-logo {
+    /* display: inline-block; Logos displayed in-line */
+    margin: 0 10px;
+    height: 40px;    
+    /* z-index: 1000;      Height adjusted automatically based on the width */
+}
+
+.logo-uss {
+    width: 230px; /* Increase the width of the USS logo if needed */
+    height: auto;
+}
+
+.logo-lab {
+    width: 230px; /* Increase the width of the USS logo if needed */
+    height: auto;
+}
+.key-features {
+    background-color: #ffffff; /* Light gray background for emphasis */
+    padding: 20px;
+    margin-top: 20px; /* Adds space between the sections */
+    border-radius: 8px; /* Rounded corners for a softer look */
+}
+
+.intro-section {
+    margin-top: 5px; /* Move the logo up */
+    z-index: 100;
+}
+.key-features ul {
+    padding-left: 20px; 
+    z-index: 100/* Keeps bullet points away from the border */
+}
+
+
+.intro-section h2 {
+    line-height: 1.4; /* Specific line spacing for the main heading */
+}
+
+.key-features li {
+    line-height: 1.8; /* Specific line spacing for list items in the key features section */
+}   
+
+.fas.fa-copy:hover {
+    color: rgb(82, 84, 205); /* Original color on hover */
+    background-color: white; /* Inverted background on hover */
+}
+
+/* Tooltip container */
+.fas.fa-info-circle {
+    position: relative;
+    display: inline-block;
+}
+
+/* Tooltip text */
+.fas.fa-info-circle .tooltip {
+    visibility: hidden;
+    width: 200px;
+    background-color: black;
+    color: #fff;
+    text-align: center;
+    border-radius: 10px;
+    padding: 8px 8px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -60px; /* Use half of the width (set above) to center the tooltip */
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 12px;
+    font-family: Arial, sans-serif; /* Arial or your chosen font */
+    text-transform: none !important;
+    font-weight: normal; /* Ensures the text is not bold */
+}
+
+/* Tooltip arrow */
+.fas.fa-info-circle .tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 30%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: black transparent transparent transparent;
+}
+
+/* Show the tooltip text when you mouse over the tooltip container */
+.fas.fa-info-circle:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
+}
+
+.non-clickable {
+    pointer-events: none;
+    color: grey; /* Optional: change the color to indicate that it's disabled */
+}
+
+.button-container .button-row {
+    justify-content: flex-end;
+    gap: 10px;
+    margin-bottom: 1px;
+    align-self: flex-end;
+    margin-bottom: -35px;
+}
+
+
+
+.visit-counter {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 0.9em;
+    text-align: center;
+
+}
+
+
+
+
+.start-pipeline-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.start-pipeline-btn {
+    padding: 10px 20px;
+    background-color: #03050e;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+
+
+.step-number {
+    margin-right: 5px; /* Espacio entre el número y el icono */
+    font-weight: bold; /* O cualquier otro estilo que prefieras */
+}
+section
+.embeding-box,
+.params-box,
+.plots-container
+.content-section,
+.category-box,
+.preprocess-box,
+.intro-section,
+.key-features,
+.local-installation,
+.start-pipeline-container,
+.start-pipeline-btn,
+.uuid-box,
+.options-container,
+.parameters-box,
+.logo-container,
+.logo-container2,
+.logo-netbio,
+.gene-list-container,
+.visit-counter {
+    transition: margin-left 0.5s ease, width 0.5s ease;
+}
+
+.show-sidebar-btn{
+    width: auto;
+    padding: 6px 14px;
+    border: none;
+    background-color: #333;
+    color: white;
+    border-radius: 0px 15px 15px 0px;
+    cursor: pointer;
+
+}
+
+.sidebar.hidden + .show-sidebar-btn {
+    display: block;
+}
+
+.sidebar i#toggleSidebarBtn {
+    position: absolute;
+    padding: 6px 16px;
+    bottom: 10px;
+    right: -20px;
+    cursor: pointer;
+    background-color: #ffffff;
+    color: rgb(0, 0, 0);
+    border-radius: 15px 0px 0px 15px;
+    z-index: 2; /* Add a higher z-index to ensure it's displayed on top of the sidebar */
+}
+
+.hidden {
+    transform: translateX(-100%);
+}
+
+.content-section {
+    transition: margin-left 0.3s ease, width 0.3s ease;
+    padding: 30px;
+    margin-top: 20px;
+    width: 83%;
+    max-width: 2000px;
+    margin-left: 220px;
+    margin-right: auto;
+}       
+
+
+.tabulator {
+   font-size: 14px;
+   border: none;
+   background-color: #fff
+}
+
+.tabulator-header {
+    font-size: 12px;
+    font-weight: bold;
+    border-bottom: 1px solid;
+    border-bottom-color: rgba(0, 0, 0, 0.12);
+    background-color: #fff;
+    color: rgb(0, 0, 0);
+ }
+
+.tabulator .tabulator-header {
+   font-weight: bold;
+   border-bottom: 1px solid;
+   border-bottom-color: rgba(0, 0, 0, 0.12);
+   background-color: #fff;
+   color: rgb(0, 0, 0);
+}
+
+.tabulator .tabulator-header .tabulator-col {
+   height: 48px;
+   background-color: #ffffff;
+   border: none;
+   padding: 0 7px;
+}
+
+.tabulator-row {
+   border-bottom: 1px solid;
+   border-bottom-color: rgba(0, 0, 0, 0.12);
+   min-height: 48px;
+   vertical-align: middle;
+}
+
+.tabulator-row .tabulator-cell {
+   padding: 16px 7px;
+   border-right: none;
+   vertical-align: middle;
+}
+
+.tabulator-row .tabulator-cell:first-of-type,
+.tabulator .tabulator-header .tabulator-col:first-of-type {
+   padding-left: 24px;
+}
+
+.tabulator-row.tabulator-row-even {
+   background-color: #ffffff;
+}
+
+.tabulator-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+/* Style for the paginator container */
+.tabulator .tabulator-paginator {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+    background-color: #f9f9f9; /* Match the background color of your webpage */
+    border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+/* Style for paginator buttons */
+.tabulator .tabulator-paginator button {
+    margin: 0 5px;
+    padding: 5px 10px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 4px;
+    background-color: #ffffff; /* Button background color */
+    color: rgba(0, 0, 0, 0.87); /* Button text color */
+    cursor: pointer;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Style for paginator buttons on hover */
+.tabulator .tabulator-paginator button:hover {
+    background-color: #e0e0e0; /* Background color on hover */
+    color: #000000; /* Text color on hover */
+}
+
+/* Style for the active page button */
+.tabulator .tabulator-paginator button.active {
+    background-color: #000000; /* Active button background color */
+    color: #ffffff; /* Active button text color */
+}
+
+/* Style for the paginator page number input (if applicable) */
+.tabulator .tabulator-paginator input[type="number"] {
+    width: 50px;
+    margin: 0 5px;
+    padding: 5px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 4px;
+    background-color: #ffffff; /* Input background color */
+    color: rgba(0, 0, 0, 0.87); /* Input text color */
+}
+
+/* Style for paginator container responsive */
+.tabulator .tabulator-paginator {
+    flex-wrap: wrap;
+}
+
+.tabulator .tabulator-paginator button.active {
+    background-color: #000000;
+
+}
+
+.tabulator .tabulator-footer {
+    background-color: #fafafa;
+
+}
+.tabulator .tabulator-footer .tabulator-footer-contents {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 5px 10px;
+    flex-direction: column;
+}
+
+.tabulator .tabulator-footer .tabulator-page.active {
+    color: rgb(255, 255, 255);
+}
+
+
+
+
+
+.tab-content > .tab {
+    display: none;
+}
+
+.tab-content > .tab.active {
+    display: block;
+}
+
+.tab-links li {
+    display: inline-block;
+    margin: 0 10px 10px 0; /* Espacio vertical agregado */
+}
+
+.tab-links li a {
+    text-decoration: none;
+    padding: 0px 5px; /* Más espacio interno vertical */
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+.tab-links li a:hover {
+    background: #e0e0e0;
+}
+
+.tab-links li a.active {
+    background: #d0d0d0;
+    border-bottom: none;
+}
+
+
+.modal_help {
+    display: none;
+    position: fixed;
+    z-index: 9000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+.modal_help-content {
+    font-family: 'Poppins', sans-serif;
+    background: white;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 95%;
+    max-width: 1000px;
+    max-height: 90vh;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+/* Help Modal Header */
+.modal_help-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 24px 30px 20px 30px;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.modal_help-content h2 {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: none;
+    color: inherit;
+    padding: 0;
+}
+
+.modal_help-content h2::before {
+    content: "";
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    background-image: url('/scexplorer/images/logo_sc_explorer_v1.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+/* Help Modal Body */
+.modal_help-content {
+    padding: 0 !important;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.modal_help-body {
+    padding: 30px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+/* Close button for help modal */
+.modal_help-content .close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: bold;
+    transition: all 0.2s ease;
+    z-index: 10;
+    float: none;
+}
+
+.modal_help-content .close:hover {
+    background: rgba(239, 68, 68, 0.3);
+    color: #fef2f2;
+    transform: scale(1.1);
+}
+
+/* Help Content Sections */
+.help-section {
+    margin-bottom: 30px;
+}
+
+.help-section img {
+    max-width: 100% !important;
+    height: auto !important;
+    margin: 20px 0 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1) !important;
+    border: 1px solid #e5e7eb !important;
+    cursor: zoom-in !important;
+}
+
+/* Highlight numbered references like (1) in help text */
+.modal_help-body .ref-num {
+    color: #dc2626 !important; /* red-600 */
+    font-weight: 700 !important;
+}
+
+/* Lightbox for help images */
+.image-lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    cursor: zoom-out;
+}
+
+.image-lightbox img {
+    max-width: 90vw;
+    max-height: 90vh;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+/* Info Box Styling */
+.info-box {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
+    border: 2px solid #0ea5e9 !important;
+    border-radius: 12px !important;
+    padding: 24px !important;
+    margin: 24px 0 !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+.info-box::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #0ea5e9, #0284c7);
+}
+
+.info-box strong:first-child {
+    font-size: 1.1rem;
+    color: #0c4a6e;
+    display: block;
+    margin-bottom: 16px;
+    position: relative;
+    padding-left: 32px;
+}
+
+.info-box strong:first-child::before {
+    content: "📋";
+    position: absolute;
+    left: 0;
+    top: 0;
+    font-size: 1.2rem;
+}
+
+.info-box p {
+    color: #0f172a !important;
+    line-height: 1.6 !important;
+    margin-bottom: 16px !important;
+}
+
+.info-box ul {
+    margin: 16px 0 !important;
+    padding-left: 20px !important;
+}
+
+.info-box li {
+    color: #0f172a !important;
+    margin-bottom: 8px !important;
+    line-height: 1.5 !important;
+}
+
+.info-box a {
+    color: #0ea5e9 !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+    transition: color 0.2s ease !important;
+}
+
+.info-box a:hover {
+    color: #0284c7 !important;
+}
+
+/* Help Modal Footer */
+.help-modal-footer {
+    padding: 20px 30px !important;
+    background: #f9fafb !important;
+    border-top: 1px solid #e5e7eb !important;
+    text-align: center !important;
+    margin-top: 20px !important;
+}
+
+.help-modal-footer button {
+    padding: 12px 32px !important;
+    background: linear-gradient(135deg, #111827 0%, #374151 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 4px 12px rgba(17, 24, 39, 0.2) !important;
+}
+
+.help-modal-footer button:hover {
+    background: linear-gradient(135deg, #1f2937 0%, #4b5563 100%) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 16px rgba(17, 24, 39, 0.3) !important;
+}
+
+/* Responsive Design for Help Modal */
+@media (max-width: 768px) {
+    .modal_help-content {
+        width: 98%;
+        max-width: none;
+        max-height: 95vh;
+        margin: 10px;
+    }
+
+    .modal_help-header {
+        padding: 20px 20px 16px 20px;
+    }
+
+    .modal_help-content h2 {
+        font-size: 1.2rem;
+    }
+
+    .modal_help-body {
+        padding: 20px;
+    }
+
+    .info-box {
+        padding: 16px !important;
+        margin: 16px 0 !important;
+    }
+
+    .info-box strong:first-child {
+        font-size: 1rem;
+        padding-left: 28px;
+    }
+
+    .modal_help-content .close {
+        top: 15px;
+        right: 15px;
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+    }
+
+    .help-modal-footer {
+        padding: 16px 20px !important;
+    }
+
+    .help-modal-footer button {
+        width: 100%;
+        padding: 14px 20px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .modal_help-header {
+        padding: 16px 16px 12px 16px;
+    }
+
+    .modal_help-content h2 {
+        font-size: 1.1rem;
+    }
+
+    .modal_help-body {
+        padding: 16px;
+    }
+
+    .info-box {
+        padding: 12px !important;
+    }
+
+    .info-box strong:first-child {
+        padding-left: 24px;
+        font-size: 0.95rem;
+    }
+}
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+
+.parameter-stage {
+    border-bottom: 2px solid #ccc;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.parameter-stage-title {
+    font-size: 1.1em;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #333;
+    border-left: 5px solid #007bff;
+    padding-left: 10px;
+    margin-top:15px;    
+}
+
+.parameter-group {
+    margin-bottom: 15px;
+}
+
+.parameter-group label {
+    font-weight: 500;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.parameter-group input,
+.parameter-group select {
+    padding: 8px;
+    width: 100%;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    font-size: 0.9em;
+}
+
+.parameter-group input:focus,
+.parameter-group select:focus {
+    border-color: #063567;
+    outline: none;
+}
+
+#runPipeline {
+    background-color: #000000;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#runPipeline:hover {
+    background-color: #000000;
+}
+
+/* Heatmap Run button — match style with pipeline */
+#runHeatmap,
+.primary-run-btn {
+    background: linear-gradient(135deg, #111827 0%, #374151 100%);
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 6px 16px rgba(17, 24, 39, 0.25);
+    width: auto;
+}
+
+#runHeatmap:hover,
+.primary-run-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(17, 24, 39, 0.3);
+}
+
+#runHeatmap:disabled,
+.primary-run-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 4px 12px rgba(17, 24, 39, 0.15);
+}
+
+.uniform-button {
+    width: auto; /* Set a fixed width for both buttons */
+    height: 35px; /* Set a fixed height for consistency */
+    padding: 8px 20px; /* Adjust padding as needed */
+    font-size: 12px; /* Ensure consistent font size */
+    text-align: center;
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
+    background-color: #000000; /* Black background */
+    color: #ffffff; /* White text color */
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.uniform-button:hover {
+    background-color: #0a5197; /* Hover color */
+}
+
+@media screen and (max-width: 768px) {
+    .sidebar ul {
+        flex-direction: row;
+        justify-content: center;
+    }
+
+    .sidebar ul li {
+        margin: 0 10px;
+    }
+
+    .sidebar-logo {
+        width: 70%;
+        margin: 10px auto;
+    }
+
+    .logo-container img, .logo-container2 img, .logo-netbio img {
+        max-width: 60%;
+        height: auto;
+    }
+
+    .logo-container, .logo-container2, .logo-netbio {
+        margin-left: 0;
+        justify-content: center;
+    }
+}
+
+/* Media query for screens smaller than 480px */
+@media screen and (max-width: 480px) {
+    .sidebar ul li a {
+        font-size: 14px; /* Smaller text for menu items */
+    }
+
+    .sidebar-logo {
+        width: 90%;
+    }
+
+    .logo-container img, .logo-container2 img, .logo-netbio img {
+        max-width: 50%;
+    }
+
+    .start-pipeline-btn {
+        font-size: 14px;
+    }
+}
+.parameters-buttons {
+    display: flex;
+    justify-content: start; /* Align buttons to the left */
+    gap: 10px; /* Space between buttons */
+    margin-bottom: 20px; /* Space below the buttons */
+    margin-top: 9px;
+}
+
+/* Version 1.2 Features Section Styling */
+.version-update {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white;
+    border-radius: 15px !important;
+    padding: 40px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2) !important;
+    /* Inherits width, margins, and positioning from .section class */
+}
+
+.version-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.version-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.version-badge {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.version-intro {
+    font-size: 1rem;
+    margin-bottom: 30px;
+    opacity: 0.95;
+    line-height: 1.6;
+}
+
+.new-features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 25px;
+    margin-bottom: 30px;
+}
+
+.feature-card {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 25px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+}
+
+.feature-icon {
+    font-size: 2.5rem;
+    margin-bottom: 15px;
+    display: block;
+}
+
+.feature-card h4 {
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.feature-card ul {
+    list-style: disc;
+    padding-left: 20px;
+    margin: 0;
+}
+
+.feature-card ul li {
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+
+.feature-card ul li strong {
+    color: #fff;
+    font-weight: 600;
+}
+
+.community-focus {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    padding: 25px;
+    text-align: center;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.community-focus h4 {
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.community-focus p {
+    font-size: 1rem;
+    line-height: 1.6;
+    margin: 0;
+    opacity: 0.95;
+}
+
+/* Responsive adjustments for version section */
+@media screen and (max-width: 768px) {
+    .version-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .version-header h2 {
+        font-size: 1.3rem;
+    }
+    
+    .new-features-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .version-update {
+        padding: 25px !important;
+        /* Margins and width inherited from .section responsive behavior */
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .version-update {
+        padding: 20px !important;
+    }
+    
+    .version-header h2 {
+        font-size: 1.2rem;
+    }
+    
+    .feature-card {
+        padding: 20px;
+    }
+    
+    .community-focus {
+        padding: 20px;
+    }
+}
